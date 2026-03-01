@@ -213,8 +213,8 @@ body {
   height: 60px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-color);
-  border-left: none;
-  border-radius: 0 8px 8px 0;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -237,50 +237,8 @@ body {
 }
 
 .metrics-column.collapsed ~ .metrics-toggle {
-  right: 0;
-  border-left: 1px solid var(--border-color);
-  border-radius: 8px 0 0 8px;
-}
-
-.metrics-column.collapsed .metrics-toggle svg {
-  transform: rotate(180deg);
-}
-
-.metrics-expand-btn {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 60px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-left: none;
-  border-radius: 8px 0 0 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  z-index: 10;
-}
-
-.metrics-expand-btn.hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.metrics-expand-btn:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--border-light);
-  width: 28px;
-}
-
-.metrics-expand-btn svg {
-  width: 14px;
-  height: 14px;
-  color: var(--text-secondary);
+  right: 0 !important;
+  transition: right 0.3s ease;
 }
 
 /* Metrics Section */

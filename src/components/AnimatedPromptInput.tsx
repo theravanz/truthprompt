@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, X, Mic } from 'lucide-react';
+import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, X, Mic, Wand2, Brain, TestTube, Globe, Code2, Lightbulb } from 'lucide-react';
 import './AnimatedPromptInput.css';
 import { AIVoiceInput } from './AIVoiceInput';
 
@@ -106,6 +106,8 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
   });
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const [selectedTools, setSelectedTools] = useState<string[]>([]);
 
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 60,
@@ -117,10 +119,13 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
       if (showModelDropdown && !(e.target as Element).closest('.model-selector')) {
         setShowModelDropdown(false);
       }
+      if (showToolsDropdown && !(e.target as Element).closest('.tools-selector')) {
+        setShowToolsDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showModelDropdown]);
+  }, [showModelDropdown, showToolsDropdown]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && value.trim()) {
@@ -181,11 +186,12 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
     setNewModel({ name: '', icon: '', apiEndpoint: '', apiKey: '' });
   };
 
-  const TEMPLATES = [
-    { id: 'fetch', label: 'Fetch', icon: Download },
-    { id: 'react', label: 'React', icon: FileCode },
-    { id: 'tests', label: 'Тесты', icon: FlaskConical },
-    { id: 'explain', label: 'Объяснить', icon: Search },
+  const TOOLS = [
+    { id: 'think', label: 'Думать', icon: Brain, description: 'Глубокий анализ задачи' },
+    { id: 'testing', label: 'Тестинг', icon: TestTube, description: 'Написание тестов' },
+    { id: 'search', label: 'Поиск', icon: Globe, description: 'Поиск в интернете' },
+    { id: 'review', label: 'Code Review', icon: Code2, description: 'Анализ кода' },
+    { id: 'explain', label: 'Объяснить', icon: Lightbulb, description: 'Подробное объяснение' },
   ];
 
   return (
@@ -248,18 +254,47 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
                   </button>
                 </div>
 
-                <div className="prompt-templates">
-                  {TEMPLATES.map((template) => (
-                    <button
-                      key={template.id}
-                      className="template-chip-animated"
-                      onClick={() => onTemplateClick(template.id)}
-                      type="button"
-                    >
-                      <template.icon size={14} />
-                      {template.label}
-                    </button>
-                  ))}
+                <div className="tools-selector">
+                  <button
+                    className="tools-selector-btn"
+                    onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+                    type="button"
+                  >
+                    <Wand2 size={18} />
+                    <span>Инструменты</span>
+                    <ChevronDown size={16} className={`tools-chevron ${showToolsDropdown ? 'rotated' : ''}`} />
+                  </button>
+
+                  {showToolsDropdown && (
+                    <div className="tools-dropdown">
+                      {TOOLS.map((tool) => {
+                        const isSelected = selectedTools.includes(tool.id);
+                        return (
+                          <button
+                            key={tool.id}
+                            className={`tools-dropdown-item ${isSelected ? 'active' : ''}`}
+                            onClick={() => {
+                              setSelectedTools(prev =>
+                                isSelected
+                                  ? prev.filter(id => id !== tool.id)
+                                  : [...prev, tool.id]
+                              );
+                            }}
+                            type="button"
+                          >
+                            <div className="tools-item-icon">
+                              <tool.icon size={18} />
+                            </div>
+                            <div className="tools-item-content">
+                              <span className="tools-item-label">{tool.label}</span>
+                              <span className="tools-item-desc">{tool.description}</span>
+                            </div>
+                            {isSelected && <span className="tools-check">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="model-selector">
@@ -298,7 +333,7 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
                           {selectedModel.id === model.id && <span className="model-check">✓</span>}
                         </button>
                       ))}
-                      
+
                       <button
                         className="add-model-btn"
                         onClick={() => {
@@ -313,17 +348,17 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
                     </div>
                   )}
                 </div>
-
-                <button
-                  className={`send-btn ${value.trim() ? 'active' : ''}`}
-                  onClick={handleSubmit}
-                  disabled={!value.trim()}
-                  type="button"
-                  aria-label="Анализировать"
-                >
-                  <ArrowRight size={18} />
-                </button>
               </div>
+
+              <button
+                className={`send-btn ${value.trim() ? 'active' : ''}`}
+                onClick={handleSubmit}
+                disabled={!value.trim()}
+                type="button"
+                aria-label="Анализировать"
+              >
+                <ArrowRight size={18} />
+              </button>
             </div>
           </div>
         </div>

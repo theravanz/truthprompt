@@ -7,11 +7,6 @@ import {
   CloudSun,
   Moon,
   Star,
-  ArrowRight,
-  Download,
-  FileCode,
-  FlaskConical,
-  Search,
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
@@ -217,21 +212,13 @@ const MainPage: React.FC = () => {
               </div>
             </aside>
 
-            {/* Кнопки управления метриками */}
-            <button 
-              className="metrics-toggle" 
+            {/* Кнопка управления метриками */}
+            <button
+              className="metrics-toggle"
               onClick={() => setMetricsCollapsed(!metricsCollapsed)}
               title={metricsCollapsed ? "Развернуть метрики" : "Свернуть метрики"}
             >
-              {metricsCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
-            </button>
-            
-            <button 
-              className={`metrics-expand-btn ${!metricsCollapsed ? 'hidden' : ''}`}
-              onClick={() => setMetricsCollapsed(false)}
-              title="Развернуть метрики"
-            >
-              <ChevronRight size={14} />
+              {metricsCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
           </div>
         </main>

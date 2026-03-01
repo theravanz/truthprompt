@@ -21,13 +21,10 @@ export function AIVoiceInput({
   onStop,
   onTranscript,
   visualizerBars = 48,
-  demoMode = false,
-  demoInterval = 3000,
   className
 }: AIVoiceInputProps) {
   const [time, setTime] = useState(0);
   const [isClient, setIsClient] = useState(false);
-  const [isDemo, setIsDemo] = useState(demoMode);
 
   useEffect(() => {
     setIsClient(true);
