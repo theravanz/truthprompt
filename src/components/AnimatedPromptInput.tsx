@@ -113,7 +113,7 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
   });
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    let intervalId: number;
     if (isRecording) {
       intervalId = setInterval(() => {
         setRecordingTime((t) => t + 1);
