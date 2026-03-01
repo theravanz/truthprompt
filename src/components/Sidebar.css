@@ -199,12 +199,22 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
 }
 
 .profile-dropdown:hover .profile-menu {
   display: block;
+}
+
+.profile-menu::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: transparent;
 }
 
 .profile-menu-item {
