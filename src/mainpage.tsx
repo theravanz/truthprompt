@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import {
   Hand,
@@ -85,7 +87,7 @@ const MainPage: React.FC = () => {
 
     const selectedGreeting = greetings[period];
     const randomSub = selectedGreeting.subtitles[Math.floor(Math.random() * selectedGreeting.subtitles.length)];
-    
+
     setGreeting(selectedGreeting);
     setRandomSubtitle(randomSub);
   };
