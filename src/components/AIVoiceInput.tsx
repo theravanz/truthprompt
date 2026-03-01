@@ -7,6 +7,7 @@ import './AIVoiceInput.css';
 interface AIVoiceInputProps {
   onStart?: () => void;
   onStop?: (duration: number) => void;
+  onTranscript?: (text: string) => void;
   visualizerBars?: number;
   demoMode?: boolean;
   demoInterval?: number;
@@ -16,6 +17,7 @@ interface AIVoiceInputProps {
 export function AIVoiceInput({
   onStart,
   onStop,
+  onTranscript,
   visualizerBars = 48,
   demoMode = false,
   demoInterval = 3000,
@@ -35,6 +37,36 @@ export function AIVoiceInput({
 
     if (submitted) {
       onStart?.();
+      
+      // Web Speech API для распознавания речи
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'ru-RU';
+        recognition.interimResults = true;
+        recognition.continuous = true;
+
+        recognition.onresult = (event: any) => {
+          const transcript = Array.from(event.results)
+            .map((result: any) => result[0].transcript)
+            .join('');
+          onTranscript?.(transcript);
+        };
+
+        recognition.onend = () => {
+          // Перезапуск если всё ещё записываем
+          if (submitted) {
+            try {
+              recognition.start();
+            } catch (e) {
+              // Игнорируем ошибки
+            }
+          }
+        };
+
+        recognition.start();
+      }
+      
       intervalId = setInterval(() => {
         setTime((t) => t + 1);
       }, 1000);
@@ -44,7 +76,7 @@ export function AIVoiceInput({
     }
 
     return () => clearInterval(intervalId);
-  }, [submitted, time, onStart, onStop]);
+  }, [submitted, onStart, onStop, onTranscript]);
 
   useEffect(() => {
     if (!isDemo) return;

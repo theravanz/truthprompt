@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, X } from 'lucide-react';
+import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, X, Mic } from 'lucide-react';
 import './AnimatedPromptInput.css';
 import { AIVoiceInput } from './AIVoiceInput';
 
@@ -158,35 +158,9 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
     console.log('Recording stopped, duration:', duration);
   };
 
-  const handleVoiceInput = () => {
-    if (isRecording) {
-      setIsRecording(false);
-      // Остановка записи и получение результата
-    } else {
-      setIsRecording(true);
-      // Web Speech API для распознавания речи
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'ru-RU';
-        recognition.interimResults = true;
-        recognition.continuous = true;
-        
-        recognition.onresult = (event: any) => {
-          const transcript = Array.from(event.results)
-            .map((result: any) => result[0].transcript)
-            .join('');
-          setValue(transcript);
-          adjustHeight();
-        };
-        
-        recognition.onend = () => {
-          // Не останавливаем таймер, если пользователь не нажал стоп
-        };
-        
-        recognition.start();
-      }
-    }
+  const handleVoiceTranscript = (text: string) => {
+    setValue(text);
+    adjustHeight();
   };
 
   const handleAddModel = () => {
@@ -232,6 +206,7 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
             <AIVoiceInput
               onStart={handleVoiceStart}
               onStop={handleVoiceStop}
+              onTranscript={handleVoiceTranscript}
               visualizerBars={48}
             />
           )}
@@ -264,11 +239,11 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
 
                   <button
                     className={`action-btn voice-btn ${isRecording ? 'recording' : ''}`}
-                    onClick={handleVoiceInput}
+                    onClick={() => setIsRecording(!isRecording)}
                     title={isRecording ? 'Остановить запись' : 'Голосовой ввод'}
                     type="button"
                   >
-                    {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+                    <Mic size={18} />
                   </button>
                 </div>
 
