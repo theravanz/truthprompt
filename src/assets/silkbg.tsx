@@ -89,17 +89,18 @@ interface SilkPlaneProps {
 }
 
 const SilkPlane = forwardRef<Mesh, SilkPlaneProps>(function SilkPlane({ uniforms }, ref) {
-  const { viewport } = useThree();
+  const mesh = ref as React.MutableRefObject<Mesh | null>;
 
   useLayoutEffect(() => {
-    const mesh = ref as React.MutableRefObject<Mesh | null>;
-    if (mesh.current) {
-      mesh.current.scale.set(viewport.width, viewport.height, 1);
+    if (mesh.current && mesh.current.parent) {
+      const parent = mesh.current.parent;
+      const width = parent.scale.x;
+      const height = parent.scale.y;
+      mesh.current.scale.set(width, height, 1);
     }
-  }, [ref, viewport]);
+  }, [ref]);
 
   useFrame((_state: RootState, delta: number) => {
-    const mesh = ref as React.MutableRefObject<Mesh | null>;
     if (mesh.current) {
       const material = mesh.current.material as ShaderMaterial & {
         uniforms: SilkUniforms;

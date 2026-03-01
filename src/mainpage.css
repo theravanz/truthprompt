@@ -168,6 +168,11 @@ body {
   pointer-events: none;
 }
 
+.silk-background canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .focus-area > * {
   position: relative;
   z-index: 1;
