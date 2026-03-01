@@ -204,6 +204,7 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
           {/* Voice Recording Panel */}
           {isRecording && (
             <AIVoiceInput
+              isActive={isRecording}
               onStart={handleVoiceStart}
               onStop={handleVoiceStop}
               onTranscript={handleVoiceTranscript}
