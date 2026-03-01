@@ -11,7 +11,8 @@
   height: 100vh;
 }
 
-.logo {
+/* Sidebar Logo */
+.sidebar .logo {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -19,11 +20,12 @@
   font-size: 1.1rem;
   color: var(--text-primary);
   text-decoration: none;
-  margin-bottom: 32px;
   padding: 0 8px;
+  white-space: nowrap;
+  margin-bottom: 32px;
 }
 
-.logo-icon {
+.sidebar .logo-icon {
   width: 32px;
   height: 32px;
   background: linear-gradient(135deg, var(--accent-white), var(--accent-silver));
@@ -33,7 +35,7 @@
   justify-content: center;
 }
 
-.logo-icon svg {
+.sidebar .logo-icon svg {
   width: 20px;
   height: 20px;
   color: var(--bg-primary);

@@ -197,6 +197,7 @@ p {
   gap: 8px;
   font-weight: 600;
   font-size: 1.1rem;
+  line-height: 1;
   color: var(--text-primary);
   text-decoration: none;
   transition: opacity 0.2s ease;
