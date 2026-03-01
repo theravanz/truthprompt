@@ -741,55 +741,6 @@ function LandingPage() {
   );
 }
 
-// App Page Component (Protected)
-function AppPage() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
-
-  return (
-    <div className="container">
-      <nav className="navbar">
-        <div className="navbar-inner">
-          <Link to="/" className="logo">
-            <div className="logo-icon">
-              <Icons.Brain size={24} />
-            </div>
-            TruthPrompt
-          </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              {user?.email}
-            </span>
-            <button onClick={handleLogout} className="btn btn-secondary">
-              Logout
-            </button>
-          </div>
-        </div>
-      </nav>
-      <section className="section" style={{ paddingTop: '120px', textAlign: 'center' }}>
-        <h1 className="fade-up">TruthPrompt App</h1>
-        <p className="fade-up delay-1" style={{ color: 'var(--text-muted)', marginTop: '16px' }}>
-          Welcome, {user?.name}! Start analyzing your AI prompts here.
-        </p>
-        <div className="fade-up delay-2" style={{ marginTop: '40px', maxWidth: '600px', margin: '40px auto 0' }}>
-          <div className="card">
-            <h3 style={{ marginBottom: '16px' }}>🚀 Coming Soon</h3>
-            <p style={{ color: 'var(--text-muted)' }}>
-              The main application interface is under development. 
-              You'll be able to enter AI prompts, get analysis scores, and review generated code here.
-            </p>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
 // Main App Component with Routes
 function App() {
   return (
