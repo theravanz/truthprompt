@@ -1,6 +1,6 @@
 import { useEffect, useState, createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
-import { HashRouter, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import './App.css';
 import * as Icons from 'lucide-react';
 import { supabase } from './lib/supabase';
