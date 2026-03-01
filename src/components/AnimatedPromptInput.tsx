@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus } from 'lucide-react';
+import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, Mic, MicOff, X } from 'lucide-react';
 import './AnimatedPromptInput.css';
 
 interface CustomModel {
@@ -103,7 +103,9 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
     apiEndpoint: '',
     apiKey: '',
   });
-  
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 60,
     maxHeight: 300,
@@ -135,6 +137,48 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
     adjustHeight(true);
   };
 
+  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAttachedFile(file);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setAttachedFile(null);
+  };
+
+  const handleVoiceInput = () => {
+    if (isRecording) {
+      setIsRecording(false);
+      // Здесь будет логика остановки записи
+    } else {
+      setIsRecording(true);
+      // Здесь будет логика начала записи
+      // Например, использование Web Speech API
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'ru-RU';
+        recognition.interimResults = true;
+        
+        recognition.onresult = (event: any) => {
+          const transcript = Array.from(event.results)
+            .map((result: any) => result[0].transcript)
+            .join('');
+          setValue(transcript);
+          adjustHeight();
+        };
+        
+        recognition.onend = () => {
+          setIsRecording(false);
+        };
+        
+        recognition.start();
+      }
+    }
+  };
+
   const handleAddModel = () => {
     if (!newModel.name || !newModel.apiEndpoint) return;
 
@@ -164,6 +208,15 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
     <>
       <div className="animated-prompt-wrapper">
         <div className="animated-prompt-input">
+          {attachedFile && (
+            <div className="attached-file">
+              <span className="attached-file-name">{attachedFile.name}</span>
+              <button onClick={handleRemoveFile} className="remove-file-btn" type="button">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          
           <div className="prompt-input-container">
             <textarea
               ref={textareaRef}
@@ -180,6 +233,40 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
 
             <div className="prompt-input-footer">
               <div className="prompt-input-actions">
+                <div className="prompt-input-left">
+                  <label className="action-btn" title="Прикрепить файл">
+                    <input
+                      type="file"
+                      onChange={handleFileAttach}
+                      hidden
+                    />
+                    <Paperclip size={18} />
+                  </label>
+
+                  <button
+                    className={`action-btn voice-btn ${isRecording ? 'recording' : ''}`}
+                    onClick={handleVoiceInput}
+                    title={isRecording ? 'Остановить запись' : 'Голосовой ввод'}
+                    type="button"
+                  >
+                    {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+                  </button>
+                </div>
+
+                <div className="prompt-templates">
+                  {TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      className="template-chip-animated"
+                      onClick={() => onTemplateClick(template.id)}
+                      type="button"
+                    >
+                      <template.icon size={14} />
+                      {template.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="model-selector">
                   <button
                     className="model-selector-btn"
@@ -230,20 +317,6 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
                       </button>
                     </div>
                   )}
-                </div>
-
-                <div className="prompt-templates">
-                  {TEMPLATES.map((template) => (
-                    <button
-                      key={template.id}
-                      className="template-chip-animated"
-                      onClick={() => onTemplateClick(template.id)}
-                      type="button"
-                    >
-                      <template.icon size={14} />
-                      {template.label}
-                    </button>
-                  ))}
                 </div>
 
                 <button
