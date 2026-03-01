@@ -160,19 +160,6 @@ body {
   height: 100%;
 }
 
-.silk-background {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-.silk-background canvas {
-  width: 100% !important;
-  height: 100% !important;
-}
-
 .focus-area > * {
   position: relative;
   z-index: 1;

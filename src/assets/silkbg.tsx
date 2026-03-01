@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unknown-property */
 import React, { forwardRef, useMemo, useRef, useLayoutEffect } from 'react';
-import { Canvas, useFrame, type RootState } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, type RootState } from '@react-three/fiber';
 import { Color, Mesh, ShaderMaterial, type IUniform } from 'three';
 
 type NormalizedRGB = [number, number, number];
@@ -89,18 +89,17 @@ interface SilkPlaneProps {
 }
 
 const SilkPlane = forwardRef<Mesh, SilkPlaneProps>(function SilkPlane({ uniforms }, ref) {
-  const mesh = ref as React.MutableRefObject<Mesh | null>;
+  const { viewport } = useThree();
 
   useLayoutEffect(() => {
-    if (mesh.current && mesh.current.parent) {
-      const parent = mesh.current.parent;
-      const width = parent.scale.x;
-      const height = parent.scale.y;
-      mesh.current.scale.set(width, height, 1);
+    const mesh = ref as React.MutableRefObject<Mesh | null>;
+    if (mesh.current) {
+      mesh.current.scale.set(viewport.width, viewport.height, 1);
     }
-  }, [ref]);
+  }, [ref, viewport]);
 
   useFrame((_state: RootState, delta: number) => {
+    const mesh = ref as React.MutableRefObject<Mesh | null>;
     if (mesh.current) {
       const material = mesh.current.material as ShaderMaterial & {
         uniforms: SilkUniforms;

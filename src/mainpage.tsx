@@ -16,7 +16,6 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import './mainpage.css';
-import Silk from './assets/silkbg';
 import { Sidebar } from './components/Sidebar';
 import { supabase } from './lib/supabase';
 
@@ -135,9 +134,6 @@ const MainPage: React.FC = () => {
 
               {/* Focus Area */}
               <div className="focus-area">
-                <div className="silk-background">
-                  <Silk speed={3} scale={1.2} color="#6B5B7A" noiseIntensity={1} rotation={0.1} />
-                </div>
                 <div className="prompt-input-area">
                   <input
                     type="text"
