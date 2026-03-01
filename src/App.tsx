@@ -7,6 +7,7 @@ import { supabase } from './lib/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import Login from './login';
 import Signup from './signup';
+import MainPage from './mainpage';
 
 // Types
 interface User {
@@ -802,7 +803,7 @@ function App() {
             path="/app"
             element={
               <ProtectedRoute>
-                <AppPage />
+                <MainPage />
               </ProtectedRoute>
             }
           />
