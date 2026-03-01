@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { HashRouter, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import './App.css';
 import * as Icons from 'lucide-react';
+import { supabase } from './lib/supabase';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import Login from './login';
 import Signup from './signup';
 
@@ -38,35 +40,52 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session on mount
-    const storedUser = localStorage.getItem('truthprompt_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    // Check for existing session
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(mapUser(session.user));
+      }
+      setIsLoading(false);
+    };
+
+    checkSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(mapUser(session.user));
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (_email: string, _password: string) => {
-    // TODO: Replace with Supabase auth
-    // const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    const mockUser = { id: '1', email: _email, name: _email.split('@')[0] };
-    setUser(mockUser);
-    localStorage.setItem('truthprompt_user', JSON.stringify(mockUser));
+  const login = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (data.user) {
+      setUser(mapUser(data.user));
+    }
   };
 
-  const signup = async (_name: string, _email: string, _password: string) => {
-    // TODO: Replace with Supabase auth
-    // const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
-    const mockUser = { id: '1', email: _email, name: _name };
-    setUser(mockUser);
-    localStorage.setItem('truthprompt_user', JSON.stringify(mockUser));
+  const signup = async (name: string, email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } }
+    });
+    if (error) throw error;
+    if (data.user) {
+      setUser(mapUser(data.user));
+    }
   };
 
   const logout = async () => {
-    // TODO: Replace with Supabase auth
-    // await supabase.auth.signOut();
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('truthprompt_user');
   };
 
   return (
@@ -74,6 +93,14 @@ function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+function mapUser(supabaseUser: SupabaseUser): User {
+  return {
+    id: supabaseUser.id,
+    email: supabaseUser.email || '',
+    name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User'
+  };
 }
 
 // Protected Route Component
