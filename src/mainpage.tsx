@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import './mainpage.css';
 import { Sidebar } from './components/Sidebar';
+import { AnimatedPromptInput } from './components/AnimatedPromptInput';
 import { supabase } from './lib/supabase';
 
 interface GreetingType {
@@ -134,35 +135,10 @@ const MainPage: React.FC = () => {
 
               {/* Focus Area */}
               <div className="focus-area">
-                <div className="prompt-input-area">
-                  <input
-                    type="text"
-                    className="prompt-input"
-                    placeholder="Напиши функцию для загрузки пользователей..."
-                    value={promptInput}
-                    onChange={(e) => setPromptInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
-                  />
-                  <button className="analyze-btn" onClick={handleAnalyze}>
-                    <ArrowRight size={18} />
-                    Анализировать
-                  </button>
-                </div>
-
-                <div className="quick-templates">
-                  <span className="template-chip" onClick={() => handleTemplateClick('fetch')}>
-                    <Download size={14} /> Fetch
-                  </span>
-                  <span className="template-chip" onClick={() => handleTemplateClick('react')}>
-                    <FileCode size={14} /> React
-                  </span>
-                  <span className="template-chip" onClick={() => handleTemplateClick('tests')}>
-                    <FlaskConical size={14} /> Тесты
-                  </span>
-                  <span className="template-chip" onClick={() => handleTemplateClick('explain')}>
-                    <Search size={14} /> Объяснить
-                  </span>
-                </div>
+                <AnimatedPromptInput
+                  onAnalyze={handleAnalyze}
+                  onTemplateClick={handleTemplateClick}
+                />
               </div>
             </div>
 
