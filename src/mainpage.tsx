@@ -53,6 +53,7 @@ const MainPage: React.FC = () => {
   const [metricsCollapsed, setMetricsCollapsed] = useState(false);
   const [greeting, setGreeting] = useState<GreetingType | null>(null);
   const [randomSubtitle, setRandomSubtitle] = useState('');
+  // const [promptInput, setPromptInput] = useState('');
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -86,9 +87,9 @@ const MainPage: React.FC = () => {
     setRandomSubtitle(randomSub);
   };
 
-  const handleAnalyze = () => {
-    if (!promptInput.trim()) return;
-    console.log('Analyzing prompt:', promptInput);
+  const handleAnalyze = (prompt: string) => {
+    if (!prompt.trim()) return;
+    console.log('Analyzing prompt:', prompt);
     // Здесь будет логика анализа
   };
 
