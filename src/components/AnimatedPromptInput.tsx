@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, Mic, MicOff, X } from 'lucide-react';
+import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, Mic, MicOff, X, StopCircle } from 'lucide-react';
 import './AnimatedPromptInput.css';
 
 interface CustomModel {
@@ -105,11 +105,24 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
   });
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
 
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 60,
     maxHeight: 300,
   });
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    if (isRecording) {
+      intervalId = setInterval(() => {
+        setRecordingTime((t) => t + 1);
+      }, 1000);
+    } else {
+      setRecordingTime(0);
+    }
+    return () => clearInterval(intervalId);
+  }, [isRecording]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -148,19 +161,25 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
     setAttachedFile(null);
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleVoiceInput = () => {
     if (isRecording) {
       setIsRecording(false);
-      // Здесь будет логика остановки записи
+      // Остановка записи и получение результата
     } else {
       setIsRecording(true);
-      // Здесь будет логика начала записи
-      // Например, использование Web Speech API
+      // Web Speech API для распознавания речи
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
         recognition.lang = 'ru-RU';
         recognition.interimResults = true;
+        recognition.continuous = true;
         
         recognition.onresult = (event: any) => {
           const transcript = Array.from(event.results)
@@ -171,7 +190,7 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
         };
         
         recognition.onend = () => {
-          setIsRecording(false);
+          // Не останавливаем таймер, если пользователь не нажал стоп
         };
         
         recognition.start();
@@ -214,6 +233,32 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
               <button onClick={handleRemoveFile} className="remove-file-btn" type="button">
                 <X size={14} />
               </button>
+            </div>
+          )}
+
+          {/* Voice Recording Panel */}
+          {isRecording && (
+            <div className="voice-recording-panel">
+              <button
+                className="voice-record-btn"
+                onClick={handleVoiceInput}
+                type="button"
+              >
+                <StopCircle size={24} className="record-icon" />
+              </button>
+              <span className="recording-time">{formatTime(recordingTime)}</span>
+              <div className="voice-visualizer">
+                {[...Array(48)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="visualizer-bar"
+                    style={{
+                      animationDelay: `${i * 0.05}s`,
+                    }}
+                  />
+                ))}
+              </div>
+              <p className="recording-status">Слушаю...</p>
             </div>
           )}
           
