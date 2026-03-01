@@ -1,15 +1,19 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search } from 'lucide-react';
+import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus } from 'lucide-react';
 import './AnimatedPromptInput.css';
 
-interface UseAutoResizeTextareaProps {
-  minHeight: number;
-  maxHeight?: number;
+interface CustomModel {
+  id: string;
+  name: string;
+  icon: string;
+  apiEndpoint: string;
+  apiKey?: string;
+  isCustom: boolean;
 }
 
-function useAutoResizeTextarea({ minHeight, maxHeight }: UseAutoResizeTextareaProps) {
+function useAutoResizeTextarea({ minHeight, maxHeight }: { minHeight: number; maxHeight?: number }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const adjustHeight = useCallback(
@@ -41,49 +45,84 @@ function useAutoResizeTextarea({ minHeight, maxHeight }: UseAutoResizeTextareaPr
     }
   }, [minHeight]);
 
-  useEffect(() => {
-    const handleResize = () => adjustHeight();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [adjustHeight]);
-
   return { textareaRef, adjustHeight };
 }
 
-const AI_MODELS = [
-  'GPT-4-1 Mini',
-  'GPT-4-1',
-  'Claude 3.5 Sonnet',
-  'Gemini 2.5 Flash',
-  'o3-mini',
+const DEFAULT_MODELS: CustomModel[] = [
+  {
+    id: 'gpt4-1-mini',
+    name: 'GPT-4.1 Mini',
+    icon: 'https://images.unsplash.com/photo-1677442136019-21780a5c6b8e?w=32&h=32&fit=crop&crop=faces&auto=format',
+    apiEndpoint: 'https://api.openai.com/v1/chat/completions',
+    isCustom: false,
+  },
+  {
+    id: 'gpt4-1',
+    name: 'GPT-4.1',
+    icon: 'https://images.unsplash.com/photo-1677442136019-21780a5c6b8e?w=32&h=32&fit=crop&crop=faces&auto=format',
+    apiEndpoint: 'https://api.openai.com/v1/chat/completions',
+    isCustom: false,
+  },
+  {
+    id: 'claude',
+    name: 'Claude 3.5 Sonnet',
+    icon: 'https://images.unsplash.com/photo-1676277791608-ac54585e6876?w=32&h=32&fit=crop&crop=faces&auto=format',
+    apiEndpoint: 'https://api.anthropic.com/v1/messages',
+    isCustom: false,
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini 2.5 Flash',
+    icon: 'https://images.unsplash.com/photo-1677442136019-21780a5c6b8e?w=32&h=32&fit=crop&crop=faces&auto=format',
+    apiEndpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+    isCustom: false,
+  },
+  {
+    id: 'o3-mini',
+    name: 'o3-mini',
+    icon: 'https://images.unsplash.com/photo-1676277791608-ac54585e6876?w=32&h=32&fit=crop&crop=faces&auto=format',
+    apiEndpoint: 'https://api.openai.com/v1/chat/completions',
+    isCustom: false,
+  },
 ];
 
-const MODEL_ICONS: Record<string, string> = {
-  'GPT-4-1 Mini': '🤖',
-  'GPT-4-1': '🤖',
-  'Claude 3.5 Sonnet': '🎭',
-  'Gemini 2.5 Flash': '💎',
-  'o3-mini': '⚡',
-};
-
 interface AnimatedPromptInputProps {
-  onAnalyze: (prompt: string) => void;
-  onTemplateClick: (template: string) => void;
+  onAnalyze: (prompt: string, model: CustomModel) => void;
+  onTemplateClick: (templateId: string) => void;
 }
 
 export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedPromptInputProps) {
   const [value, setValue] = useState('');
-  const [selectedModel, setSelectedModel] = useState('GPT-4-1 Mini');
+  const [models, setModels] = useState<CustomModel[]>(DEFAULT_MODELS);
+  const [selectedModel, setSelectedModel] = useState<CustomModel>(DEFAULT_MODELS[0]);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newModel, setNewModel] = useState<Partial<CustomModel>>({
+    name: '',
+    icon: '',
+    apiEndpoint: '',
+    apiKey: '',
+  });
+  
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
-    minHeight: 56,
+    minHeight: 60,
     maxHeight: 300,
   });
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showModelDropdown && !(e.target as Element).closest('.model-selector')) {
+        setShowModelDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showModelDropdown]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && value.trim()) {
       e.preventDefault();
-      onAnalyze(value);
+      onAnalyze(value, selectedModel);
       setValue('');
       adjustHeight(true);
     }
@@ -91,9 +130,27 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
 
   const handleSubmit = () => {
     if (!value.trim()) return;
-    onAnalyze(value);
+    onAnalyze(value, selectedModel);
     setValue('');
     adjustHeight(true);
+  };
+
+  const handleAddModel = () => {
+    if (!newModel.name || !newModel.apiEndpoint) return;
+
+    const customModel: CustomModel = {
+      id: `custom-${Date.now()}`,
+      name: newModel.name,
+      icon: newModel.icon || 'https://images.unsplash.com/photo-1677442136019-21780a5c6b8e?w=32&h=32&fit=crop&crop=faces&auto=format',
+      apiEndpoint: newModel.apiEndpoint,
+      apiKey: newModel.apiKey,
+      isCustom: true,
+    };
+
+    setModels([...models, customModel]);
+    setSelectedModel(customModel);
+    setShowAddModal(false);
+    setNewModel({ name: '', icon: '', apiEndpoint: '', apiKey: '' });
   };
 
   const TEMPLATES = [
@@ -104,83 +161,173 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
   ];
 
   return (
-    <div className="animated-prompt-wrapper">
-      <div className="animated-prompt-input">
-        <div className="prompt-input-container">
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              adjustHeight();
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="Напиши функцию для загрузки пользователей..."
-            className="prompt-textarea"
-            rows={1}
-          />
+    <>
+      <div className="animated-prompt-wrapper">
+        <div className="animated-prompt-input">
+          <div className="prompt-input-container">
+            <textarea
+              ref={textareaRef}
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                adjustHeight();
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Напиши функцию для загрузки пользователей..."
+              className="prompt-textarea"
+              rows={1}
+            />
 
-          <div className="prompt-input-footer">
-            <div className="prompt-input-actions">
-              <div className="model-selector">
-                <button
-                  className="model-selector-btn"
-                  onClick={() => setShowModelDropdown(!showModelDropdown)}
-                  type="button"
-                >
-                  <span className="model-icon">{MODEL_ICONS[selectedModel]}</span>
-                  <span className="model-name">{selectedModel}</span>
-                  <ChevronDown size={14} className={`model-chevron ${showModelDropdown ? 'rotated' : ''}`} />
-                </button>
+            <div className="prompt-input-footer">
+              <div className="prompt-input-actions">
+                <div className="model-selector">
+                  <button
+                    className="model-selector-btn"
+                    onClick={() => setShowModelDropdown(!showModelDropdown)}
+                    type="button"
+                  >
+                    {selectedModel.icon ? (
+                      <img src={selectedModel.icon} alt="" className="model-avatar" />
+                    ) : (
+                      <span className="model-icon">🤖</span>
+                    )}
+                    <span className="model-name">{selectedModel.name}</span>
+                    <ChevronDown size={16} className={`model-chevron ${showModelDropdown ? 'rotated' : ''}`} />
+                  </button>
 
-                {showModelDropdown && (
-                  <div className="model-dropdown">
-                    {AI_MODELS.map((model) => (
+                  {showModelDropdown && (
+                    <div className="model-dropdown">
+                      {models.map((model) => (
+                        <button
+                          key={model.id}
+                          className={`model-dropdown-item ${selectedModel.id === model.id ? 'active' : ''}`}
+                          onClick={() => {
+                            setSelectedModel(model);
+                            setShowModelDropdown(false);
+                          }}
+                          type="button"
+                        >
+                          {model.icon ? (
+                            <img src={model.icon} alt="" className="model-avatar" />
+                          ) : (
+                            <span className="model-icon">🤖</span>
+                          )}
+                          <span className="model-name">{model.name}</span>
+                          {selectedModel.id === model.id && <span className="model-check">✓</span>}
+                        </button>
+                      ))}
+                      
                       <button
-                        key={model}
-                        className={`model-dropdown-item ${selectedModel === model ? 'active' : ''}`}
+                        className="add-model-btn"
                         onClick={() => {
-                          setSelectedModel(model);
+                          setShowAddModal(true);
                           setShowModelDropdown(false);
                         }}
                         type="button"
                       >
-                        <span className="model-icon">{MODEL_ICONS[model]}</span>
-                        <span className="model-name">{model}</span>
-                        {selectedModel === model && <span className="model-check">✓</span>}
+                        <Plus size={18} />
+                        <span>Добавить модель</span>
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  )}
+                </div>
 
-              <div className="prompt-templates">
-                {TEMPLATES.map((template) => (
-                  <button
-                    key={template.id}
-                    className="template-chip-animated"
-                    onClick={() => onTemplateClick(template.id)}
-                    type="button"
-                  >
-                    <template.icon size={14} />
-                    {template.label}
-                  </button>
-                ))}
-              </div>
+                <div className="prompt-templates">
+                  {TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      className="template-chip-animated"
+                      onClick={() => onTemplateClick(template.id)}
+                      type="button"
+                    >
+                      <template.icon size={14} />
+                      {template.label}
+                    </button>
+                  ))}
+                </div>
 
-              <button
-                className={`send-btn ${value.trim() ? 'active' : ''}`}
-                onClick={handleSubmit}
-                disabled={!value.trim()}
-                type="button"
-                aria-label="Анализировать"
-              >
-                <ArrowRight size={18} />
-              </button>
+                <button
+                  className={`send-btn ${value.trim() ? 'active' : ''}`}
+                  onClick={handleSubmit}
+                  disabled={!value.trim()}
+                  type="button"
+                  aria-label="Анализировать"
+                >
+                  <ArrowRight size={18} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="add-model-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Добавить модель</h3>
+            
+            <div className="modal-field">
+              <label>Название</label>
+              <input
+                type="text"
+                value={newModel.name}
+                onChange={(e) => setNewModel({ ...newModel, name: e.target.value })}
+                placeholder="GPT-4, Claude, и т.д."
+                autoFocus
+              />
+            </div>
+
+            <div className="modal-field">
+              <label>URL иконки</label>
+              <input
+                type="url"
+                value={newModel.icon}
+                onChange={(e) => setNewModel({ ...newModel, icon: e.target.value })}
+                placeholder="https://example.com/icon.jpg"
+              />
+              {newModel.icon && (
+                <div className="image-preview">
+                  <img src={newModel.icon} alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                  <span>Превью иконки</span>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-field">
+              <label>API Endpoint</label>
+              <input
+                type="url"
+                value={newModel.apiEndpoint}
+                onChange={(e) => setNewModel({ ...newModel, apiEndpoint: e.target.value })}
+                placeholder="https://api.example.com/v1/chat"
+              />
+            </div>
+
+            <div className="modal-field">
+              <label>API Key (опционально)</label>
+              <input
+                type="password"
+                value={newModel.apiKey}
+                onChange={(e) => setNewModel({ ...newModel, apiKey: e.target.value })}
+                placeholder="sk-..."
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button className="modal-cancel" onClick={() => setShowAddModal(false)}>
+                Отмена
+              </button>
+              <button 
+                className="modal-add" 
+                onClick={handleAddModel}
+                disabled={!newModel.name || !newModel.apiEndpoint}
+              >
+                Добавить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
