@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, Mic, MicOff, X, StopCircle } from 'lucide-react';
+import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, Mic, MicOff, X } from 'lucide-react';
 import './AnimatedPromptInput.css';
 
 interface CustomModel {
@@ -244,21 +244,32 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
                 onClick={handleVoiceInput}
                 type="button"
               >
-                <StopCircle size={24} className="record-icon" />
+                {isRecording ? (
+                  <div className="recording-spinner" />
+                ) : (
+                  <Mic size={32} className="mic-icon" />
+                )}
               </button>
-              <span className="recording-time">{formatTime(recordingTime)}</span>
+
+              <span className={`recording-time ${isRecording ? 'visible' : ''}`}>
+                {formatTime(recordingTime)}
+              </span>
+
               <div className="voice-visualizer">
                 {[...Array(48)].map((_, i) => (
                   <div
                     key={i}
-                    className="visualizer-bar"
+                    className={`visualizer-bar ${isRecording ? 'active' : ''}`}
                     style={{
                       animationDelay: `${i * 0.05}s`,
                     }}
                   />
                 ))}
               </div>
-              <p className="recording-status">Слушаю...</p>
+
+              <p className="recording-status">
+                {isRecording ? 'Listening...' : 'Click to speak'}
+              </p>
             </div>
           )}
           

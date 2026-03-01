@@ -122,12 +122,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 16px;
-  margin: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 8px;
+  padding: 16px;
   animation: fadeIn 0.3s ease;
 }
 
@@ -148,73 +144,99 @@
   justify-content: center;
   width: 64px;
   height: 64px;
-  background: rgba(239, 68, 68, 0.2);
-  border: 2px solid rgba(239, 68, 68, 0.5);
-  border-radius: 16px;
-  color: #ef4444;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .voice-record-btn:hover {
-  background: rgba(239, 68, 68, 0.3);
-  border-color: rgba(239, 68, 68, 0.7);
-  transform: scale(1.05);
+  background: rgba(0, 0, 0, 0.1);
 }
 
-.record-icon {
-  animation: pulse-icon 1.5s infinite;
+.dark .voice-record-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
-@keyframes pulse-icon {
-  0%, 100% {
-    opacity: 1;
+.mic-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+
+.voice-record-btn:hover .mic-icon {
+  color: var(--text-primary);
+}
+
+.recording-spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--text-primary);
+  animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
   }
-  50% {
-    opacity: 0.5;
+  to {
+    transform: rotate(360deg);
   }
 }
 
 .recording-time {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  height: 20px;
+}
+
+.recording-time.visible {
+  opacity: 1;
 }
 
 .voice-visualizer {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  height: 48px;
+  gap: 2px;
+  height: 32px;
   width: 100%;
-  max-width: 300px;
+  max-width: 256px;
 }
 
 .visualizer-bar {
-  width: 3px;
-  height: 8px;
-  background: linear-gradient(180deg, rgba(239, 68, 68, 0.8), rgba(239, 68, 68, 0.3));
+  width: 2px;
+  height: 4px;
+  background: var(--text-muted);
   border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.visualizer-bar.active {
+  background: var(--text-secondary);
   animation: visualize 0.8s ease-in-out infinite;
   animation-fill-mode: both;
 }
 
 @keyframes visualize {
   0%, 100% {
-    height: 8px;
+    height: 4px;
   }
   50% {
-    height: 40px;
+    height: 24px;
   }
 }
 
 .recording-status {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  height: 16px;
 }
 
 .prompt-input-footer {
