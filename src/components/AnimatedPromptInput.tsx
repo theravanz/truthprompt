@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, Mic, MicOff, X } from 'lucide-react';
+import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, X } from 'lucide-react';
 import './AnimatedPromptInput.css';
+import { AIVoiceInput } from './AIVoiceInput';
 
 interface CustomModel {
   id: string;
@@ -105,24 +106,11 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
   });
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
 
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 60,
     maxHeight: 300,
   });
-
-  useEffect(() => {
-    let intervalId: number;
-    if (isRecording) {
-      intervalId = setInterval(() => {
-        setRecordingTime((t) => t + 1);
-      }, 1000);
-    } else {
-      setRecordingTime(0);
-    }
-    return () => clearInterval(intervalId);
-  }, [isRecording]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -161,10 +149,13 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
     setAttachedFile(null);
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const handleVoiceStart = () => {
+    setIsRecording(true);
+  };
+
+  const handleVoiceStop = (duration: number) => {
+    setIsRecording(false);
+    console.log('Recording stopped, duration:', duration);
   };
 
   const handleVoiceInput = () => {
@@ -238,39 +229,11 @@ export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedProm
 
           {/* Voice Recording Panel */}
           {isRecording && (
-            <div className="voice-recording-panel">
-              <button
-                className="voice-record-btn"
-                onClick={handleVoiceInput}
-                type="button"
-              >
-                {isRecording ? (
-                  <div className="recording-spinner" />
-                ) : (
-                  <Mic size={32} className="mic-icon" />
-                )}
-              </button>
-
-              <span className={`recording-time ${isRecording ? 'visible' : ''}`}>
-                {formatTime(recordingTime)}
-              </span>
-
-              <div className="voice-visualizer">
-                {[...Array(48)].map((_, i) => (
-                  <div
-                    key={i}
-                    className={`visualizer-bar ${isRecording ? 'active' : ''}`}
-                    style={{
-                      animationDelay: `${i * 0.05}s`,
-                    }}
-                  />
-                ))}
-              </div>
-
-              <p className="recording-status">
-                {isRecording ? 'Listening...' : 'Click to speak'}
-              </p>
-            </div>
+            <AIVoiceInput
+              onStart={handleVoiceStart}
+              onStop={handleVoiceStop}
+              visualizerBars={48}
+            />
           )}
           
           <div className="prompt-input-container">
