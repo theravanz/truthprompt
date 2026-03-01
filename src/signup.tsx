@@ -60,10 +60,11 @@ function Signup() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/app`
+          redirectTo: window.location.origin
         }
       });
       if (error) throw error;
+      // OAuth redirect - page will reload
     } catch (err: any) {
       setError(err.message || `Failed to sign up with ${provider}. Please try again.`);
       setSocialLoading(null);
