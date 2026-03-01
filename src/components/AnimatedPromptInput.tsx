@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowRight, ChevronDown, Download, FileCode, FlaskConical, Search, Plus, Paperclip, X, Mic, Wand2, Brain, TestTube, Globe, Code2, Lightbulb } from 'lucide-react';
+import { ArrowRight, ChevronDown, Plus, Paperclip, X, Mic, Wand2, Brain, TestTube, Globe, Code2, Lightbulb } from 'lucide-react';
 import './AnimatedPromptInput.css';
 import { AIVoiceInput } from './AIVoiceInput';
 
@@ -89,10 +89,9 @@ const DEFAULT_MODELS: CustomModel[] = [
 
 interface AnimatedPromptInputProps {
   onAnalyze: (prompt: string, model: CustomModel) => void;
-  onTemplateClick: (templateId: string) => void;
 }
 
-export function AnimatedPromptInput({ onAnalyze, onTemplateClick }: AnimatedPromptInputProps) {
+export function AnimatedPromptInput({ onAnalyze }: AnimatedPromptInputProps) {
   const [value, setValue] = useState('');
   const [models, setModels] = useState<CustomModel[]>(DEFAULT_MODELS);
   const [selectedModel, setSelectedModel] = useState<CustomModel>(DEFAULT_MODELS[0]);

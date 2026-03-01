@@ -93,16 +93,6 @@ const MainPage: React.FC = () => {
     // Здесь будет логика анализа
   };
 
-  const handleTemplateClick = (template: string) => {
-    const templates: Record<string, string> = {
-      fetch: 'Напиши функцию для загрузки данных с API',
-      react: 'Создай React компонент формы с валидацией',
-      tests: 'Напиши unit тесты для калькулятора',
-      explain: 'Объясни как работает промис в JavaScript'
-    };
-    setPromptInput(templates[template] || '');
-  };
-
   const GreetingIcon = greeting?.icon || Hand;
 
   return (
@@ -132,7 +122,6 @@ const MainPage: React.FC = () => {
               <div className="focus-area">
                 <AnimatedPromptInput
                   onAnalyze={handleAnalyze}
-                  onTemplateClick={handleTemplateClick}
                 />
               </div>
             </div>
