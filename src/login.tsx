@@ -12,7 +12,7 @@ import {
   Shield,
   AlertCircle
 } from 'lucide-react';
-import { useAuth } from './App';
+import { supabase } from './lib/supabase';
 import './Auth.css';
 
 function Login() {
@@ -22,19 +22,19 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [socialLoading, setSocialLoading] = useState<'google' | 'github' | null>(null);
-  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    
+
     try {
-      await login(email, password);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
       navigate('/app');
-    } catch (err) {
-      setError('Failed to login. Please check your credentials.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to login. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -43,17 +43,17 @@ function Login() {
   const handleSocialLogin = async (provider: 'google' | 'github') => {
     setSocialLoading(provider);
     setError('');
-    
+
     try {
-      // TODO: Replace with Supabase OAuth
-      // await supabase.auth.signInWithOAuth({ provider });
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const mockUser = { id: '1', email: `user@${provider}.com`, name: `${provider} User` };
-      localStorage.setItem('truthprompt_user', JSON.stringify(mockUser));
-      navigate('/app');
-    } catch (err) {
-      setError(`Failed to login with ${provider}. Please try again.`);
-    } finally {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/app`
+        }
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message || `Failed to login with ${provider}. Please try again.`);
       setSocialLoading(null);
     }
   };

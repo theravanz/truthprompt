@@ -14,7 +14,7 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
-import { useAuth } from './App';
+import { supabase } from './lib/supabase';
 import './Auth.css';
 
 function Signup() {
@@ -28,19 +28,25 @@ function Signup() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState('');
   const [socialLoading, setSocialLoading] = useState<'google' | 'github' | null>(null);
-  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    
+
     try {
-      await signup(name, email, password);
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name }
+        }
+      });
+      if (error) throw error;
       navigate('/app');
-    } catch (err) {
-      setError('Failed to create account. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to create account. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -49,17 +55,17 @@ function Signup() {
   const handleSocialSignup = async (provider: 'google' | 'github') => {
     setSocialLoading(provider);
     setError('');
-    
+
     try {
-      // TODO: Replace with Supabase OAuth
-      // await supabase.auth.signInWithOAuth({ provider });
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const mockUser = { id: '1', email: `user@${provider}.com`, name: `${provider} User` };
-      localStorage.setItem('truthprompt_user', JSON.stringify(mockUser));
-      navigate('/app');
-    } catch (err) {
-      setError(`Failed to sign up with ${provider}. Please try again.`);
-    } finally {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/app`
+        }
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message || `Failed to sign up with ${provider}. Please try again.`);
       setSocialLoading(null);
     }
   };
