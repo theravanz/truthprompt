@@ -53,7 +53,6 @@ const MainPage: React.FC = () => {
   const [metricsCollapsed, setMetricsCollapsed] = useState(false);
   const [greeting, setGreeting] = useState<GreetingType | null>(null);
   const [randomSubtitle, setRandomSubtitle] = useState('');
-  const [promptInput, setPromptInput] = useState('');
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
