@@ -32,7 +32,15 @@
   pointer-events: none;
 }
 
-.animated-prompt-input::after {
+.animated-prompt-input__shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.animated-prompt-input__shine::after {
   content: '';
   position: absolute;
   top: 0;
@@ -41,10 +49,9 @@
   height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
   transition: left 0.8s ease;
-  pointer-events: none;
 }
 
-.animated-prompt-input:hover::after {
+.animated-prompt-input:hover .animated-prompt-input__shine::after {
   left: 100%;
 }
 

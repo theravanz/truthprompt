@@ -51,38 +51,24 @@ function useAutoResizeTextarea({ minHeight, maxHeight }: { minHeight: number; ma
 
 const DEFAULT_MODELS: CustomModel[] = [
   {
-    id: 'gpt4-1-mini',
-    name: 'GPT-4.1 Mini',
-    icon: 'https://images.unsplash.com/photo-1677442136019-21780a5c6b8e?w=32&h=32&fit=crop&crop=faces&auto=format',
-    apiEndpoint: 'https://api.openai.com/v1/chat/completions',
+    id: 'google/gemma-3-27b-it',
+    name: 'Gemma 3',
+    icon: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR9x1KPQxtiORiV5wo8km6sygu7msLPSS0GzQ&s',
+    apiEndpoint: 'https://openrouter.ai/api/v1/chat/completions',
     isCustom: false,
   },
   {
-    id: 'gpt4-1',
-    name: 'GPT-4.1',
-    icon: 'https://images.unsplash.com/photo-1677442136019-21780a5c6b8e?w=32&h=32&fit=crop&crop=faces&auto=format',
-    apiEndpoint: 'https://api.openai.com/v1/chat/completions',
+    id: 'qwen/qwen3-coder-480b-a35b-free',
+    name: 'Qwen Coder',
+    icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Qwen_logo.svg/250px-Qwen_logo.svg.png',
+    apiEndpoint: 'https://openrouter.ai/api/v1/chat/completions',
     isCustom: false,
   },
   {
-    id: 'claude',
-    name: 'Claude 3.5 Sonnet',
-    icon: 'https://images.unsplash.com/photo-1676277791608-ac54585e6876?w=32&h=32&fit=crop&crop=faces&auto=format',
-    apiEndpoint: 'https://api.anthropic.com/v1/messages',
-    isCustom: false,
-  },
-  {
-    id: 'gemini',
-    name: 'Gemini 2.5 Flash',
-    icon: 'https://images.unsplash.com/photo-1677442136019-21780a5c6b8e?w=32&h=32&fit=crop&crop=faces&auto=format',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
-    isCustom: false,
-  },
-  {
-    id: 'o3-mini',
-    name: 'o3-mini',
-    icon: 'https://images.unsplash.com/photo-1676277791608-ac54585e6876?w=32&h=32&fit=crop&crop=faces&auto=format',
-    apiEndpoint: 'https://api.openai.com/v1/chat/completions',
+    id: 'meta-llama/llama-3.2-3b-instruct',
+    name: 'Llama 3.2',
+    icon: '​https://ih1.redbubble.net/image.5611428487.0532/bg,f8f8f8-flat,750x,075,f-pad,750x1000,f8f8f8.webp',
+    apiEndpoint: 'https://openrouter.ai/api/v1/chat/completions',
     isCustom: false,
   },
 ];
@@ -197,6 +183,7 @@ export function AnimatedPromptInput({ onAnalyze }: AnimatedPromptInputProps) {
     <>
       <div className="animated-prompt-wrapper">
         <div className="animated-prompt-input">
+          <div className="animated-prompt-input__shine" />
           {attachedFile && (
             <div className="attached-file">
               <span className="attached-file-name">{attachedFile.name}</span>

@@ -1,7 +1,7 @@
 'use client';
 
 import { Mic } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './AIVoiceInput.css';
 
 interface AIVoiceInputProps {
@@ -25,55 +25,84 @@ export function AIVoiceInput({
 }: AIVoiceInputProps) {
   const [time, setTime] = useState(0);
   const [isClient, setIsClient] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const isActiveRef = useRef(isActive);
+
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
-    let intervalId: number;
-
     if (isActive) {
       onStart?.();
-      
-      // Web Speech API для распознавания речи
+
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'ru-RU';
-        recognition.interimResults = true;
-        recognition.continuous = true;
+        const rec = new SpeechRecognition();
+        rec.lang = 'en-US';
+        rec.interimResults = true;
+        rec.continuous = true;
 
-        recognition.onresult = (event: any) => {
+        rec.onresult = (event: any) => {
           const transcript = Array.from(event.results)
             .map((result: any) => result[0].transcript)
             .join('');
           onTranscript?.(transcript);
         };
 
-        recognition.onend = () => {
-          // Перезапуск если всё ещё записываем
-          if (isActive) {
+        rec.onerror = (event: any) => {
+          if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            console.error('[Voice] Error:', event.error);
+          }
+        };
+
+        rec.onend = () => {
+          // Используем ref для проверки текущего состояния
+          if (isActiveRef.current && recognitionRef.current === rec) {
             try {
-              recognition.start();
+              rec.start();
             } catch (e) {
               // Игнорируем ошибки
             }
           }
         };
 
-        recognition.start();
+        rec.start();
+        recognitionRef.current = rec;
+
+        const intervalId = setInterval(() => {
+          setTime((t) => t + 1);
+        }, 1000);
+
+        return () => {
+          clearInterval(intervalId);
+          // Принудительно останавливаем распознавание при размонтировании или деактивации
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.abort();
+            } catch (e) {
+              // Игнорируем ошибки
+            }
+            recognitionRef.current = null;
+          }
+        };
       }
-      
-      intervalId = setInterval(() => {
-        setTime((t) => t + 1);
-      }, 1000);
     } else {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // Игнорируем ошибки
+        }
+        recognitionRef.current = null;
+      }
       onStop?.(time);
       setTime(0);
     }
-
-    return () => clearInterval(intervalId);
   }, [isActive, onStart, onStop, onTranscript]);
 
   const formatTime = (seconds: number) => {

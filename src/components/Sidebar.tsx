@@ -1,6 +1,7 @@
 import { Brain, Home, LayoutGrid, FileText, TriangleAlert, BookOpen, Users, Medal, Shield, Settings, LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../App';
 import './Sidebar.css';
 
 interface User {
@@ -9,6 +10,7 @@ interface User {
 }
 
 export function Sidebar() {
+  const { logout } = useAuth();
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -23,6 +25,10 @@ export function Sidebar() {
     };
     loadUser();
   }, []);
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   const firstLetter = user?.name?.charAt(0).toUpperCase() || 'U';
 
@@ -105,10 +111,10 @@ export function Sidebar() {
               Настройки
             </a>
             <div className="profile-menu-divider"></div>
-            <a href="#" className="profile-menu-item logout">
+            <button type="button" className="profile-menu-item logout" onClick={handleLogout}>
               <LogOut size={16} />
               Выйти
-            </a>
+            </button>
           </div>
         </div>
       </div>
