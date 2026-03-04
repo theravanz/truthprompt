@@ -6,6 +6,7 @@ import { ArrowLeft, Copy, Check, Trash2, Share2, Download } from 'lucide-react';
 import './ChatView.css';
 import { AnimatedPromptInput } from './AnimatedPromptInput';
 import type { CustomModel } from './AnimatedPromptInput';
+import { useTransition } from '../contexts/TransitionContext';
 
 interface Message {
   id: string;
@@ -26,6 +27,7 @@ export function ChatView() {
   const params = useParams();
   const navigate = useNavigate();
   const chatId = params.chatId;
+  const { transitionData, endTransition } = useTransition();
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatTitle, setChatTitle] = useState('Новый чат');
@@ -38,7 +40,20 @@ export function ChatView() {
     if (chatId) {
       loadChat(chatId);
     }
-  }, [chatId]);
+    
+    // Если есть данные перехода, используем их
+    if (transitionData && transitionData.chatId === chatId) {
+      const initialMessage: Message = {
+        id: `msg-${Date.now()}`,
+        role: 'user',
+        content: transitionData.prompt,
+        timestamp: Date.now(),
+        model: transitionData.model
+      };
+      setMessages([initialMessage]);
+      endTransition();
+    }
+  }, [chatId, transitionData]);
 
   useEffect(() => {
     scrollToBottom();

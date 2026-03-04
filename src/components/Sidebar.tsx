@@ -48,14 +48,14 @@ export function Sidebar() {
         </li>
         <li className="nav-item">
           <a href="#" className="nav-link">
-            <LayoutGrid size={20} />
-            Dashboard
+            <FileText size={20} />
+            Чаты
           </a>
         </li>
         <li className="nav-item">
           <a href="#" className="nav-link">
-            <FileText size={20} />
-            История
+            <LayoutGrid size={20} />
+            Dashboard
           </a>
         </li>
         <li className="nav-item">

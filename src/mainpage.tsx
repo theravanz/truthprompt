@@ -16,6 +16,7 @@ import { Sidebar } from './components/Sidebar';
 import { AnimatedPromptInput } from './components/AnimatedPromptInput';
 import type { CustomModel } from './components/AnimatedPromptInput';
 import { supabase } from './lib/supabase';
+import { useTransition } from './contexts/TransitionContext';
 
 interface GreetingType {
   text: string;
@@ -53,10 +54,12 @@ const greetings: Record<string, GreetingType> = {
 
 const MainPage: React.FC = () => {
   const navigate = useNavigate();
+  const { startTransition } = useTransition();
   const [metricsCollapsed, setMetricsCollapsed] = useState(false);
   const [greeting, setGreeting] = useState<GreetingType | null>(null);
   const [randomSubtitle, setRandomSubtitle] = useState('');
   const [user, setUser] = useState<User | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     updateGreeting();
@@ -92,7 +95,7 @@ const MainPage: React.FC = () => {
   const handleAnalyze = (prompt: string, model: CustomModel) => {
     if (!prompt.trim()) return;
     
-    // Генерируем уникальный ID чата и перенаправляем
+    // Генерируем уникальный ID чата
     const chatId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Сохраняем первое сообщение в localStorage
@@ -118,8 +121,14 @@ const MainPage: React.FC = () => {
     
     localStorage.setItem('truthprompt_chats', JSON.stringify(chats));
     
-    // Перенаправляем на страницу чата
-    navigate(`/chat/${chatId}`);
+    // Запускаем анимацию перехода
+    setIsTransitioning(true);
+    startTransition({ prompt, model: model.name, chatId });
+    
+    // Небольшая задержка для анимации
+    setTimeout(() => {
+      navigate(`/chat/${chatId}`);
+    }, 300);
   };
 
   const GreetingIcon = greeting?.icon || Hand;
@@ -130,7 +139,7 @@ const MainPage: React.FC = () => {
       <div className="orb orb-2"></div>
       <div className="grid-overlay"></div>
 
-      <div className="dashboard">
+      <div className={`dashboard ${isTransitioning ? 'transitioning' : ''}`}>
         {/* Sidebar */}
         <Sidebar />
 
