@@ -163,36 +163,59 @@ export async function sendToAI(
   model: string,
   apiKey: string
 ): Promise<string> {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'TruthPrompt'
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: 'system',
-          content: 'Ты TruthPrompt - AI ассистент для анализа промптов и код-ревью. Твоя задача - помогать разработчикам писать качественный код, находить уязвимости, проблемы с производительностью и предлагать улучшения. Отвечай подробно, с примерами кода.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000
-    })
-  });
+  console.log('[sendToAI] Sending request to OpenRouter...');
+  console.log('[sendToAI] Model:', model);
+  console.log('[sendToAI] Prompt length:', prompt.length);
+  
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'TruthPrompt'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: 'Ты TruthPrompt - AI ассистент для анализа промптов и код-ревью. Твоя задача - помогать разработчикам писать качественный код, находить уязвимости, проблемы с производительностью и предлагать улучшения. Отвечай подробно, с примерами кода.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      })
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Ошибка при запросе к AI');
+    console.log('[sendToAI] Response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[sendToAI] Error response:', errorText);
+      
+      let errorMessage = 'Ошибка при запросе к AI';
+      try {
+        const error = JSON.parse(errorText);
+        errorMessage = error.error?.message || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    console.log('[sendToAI] Response data:', data);
+    
+    return data.choices?.[0]?.message?.content || 'Нет ответа от AI';
+  } catch (error: any) {
+    console.error('[sendToAI] Exception:', error.message);
+    throw error;
   }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || 'Нет ответа от AI';
 }

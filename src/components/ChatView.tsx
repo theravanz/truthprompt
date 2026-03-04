@@ -112,15 +112,24 @@ export function ChatView() {
         model_name: model.name
       });
 
-      // Получаем API ключ из localStorage (пользователь должен добавить его в настройках)
-      const apiKey = localStorage.getItem('openrouter_api_key') || '';
-      
+      // Получаем API ключ из переменной окружения Vercel или localStorage
+      // Vite автоматически подставляет переменные с префиксом VITE_
+      const apiKey = (import.meta as any).env.VITE_OPENROUTER_KEY || 
+                     (import.meta as any).env.OPENROUTER_KEY || 
+                     localStorage.getItem('openrouter_api_key') || '';
+
+      console.log('[ChatView] API Key exists:', !!apiKey);
+      console.log('[ChatView] Model:', model.id);
+
       let aiResponse: string;
-      
+
       if (apiKey) {
+        console.log('[ChatView] Sending request to AI...');
         // Отправляем запрос к реальному AI
         aiResponse = await sendToAI(prompt, model.id, apiKey);
+        console.log('[ChatView] AI response received');
       } else {
+        console.log('[ChatView] No API key, using mock response');
         // Используем mock-ответ если нет API ключа
         aiResponse = generateMockResponse(prompt);
         await new Promise(resolve => setTimeout(resolve, 1500));
