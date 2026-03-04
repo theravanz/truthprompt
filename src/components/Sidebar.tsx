@@ -1,7 +1,9 @@
 import { Brain, Home, LayoutGrid, FileText, TriangleAlert, BookOpen, Users, Medal, Shield, Settings, LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../App';
+import { getUserChats, type Chat } from '../lib/chats';
 import './Sidebar.css';
 
 interface User {
@@ -11,7 +13,9 @@ interface User {
 
 export function Sidebar() {
   const { logout } = useAuth();
+  const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
+  const [recentChats, setRecentChats] = useState<Chat[]>([]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -24,13 +28,28 @@ export function Sidebar() {
       }
     };
     loadUser();
+    loadRecentChats();
   }, []);
+
+  const loadRecentChats = async () => {
+    try {
+      const chats = await getUserChats();
+      setRecentChats(chats.slice(0, 5)); // Показываем только последние 5 чатов
+    } catch (err) {
+      console.error('Error loading recent chats:', err);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
   };
 
   const firstLetter = user?.name?.charAt(0).toUpperCase() || 'U';
+
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
 
   return (
     <aside className="sidebar">
@@ -41,16 +60,16 @@ export function Sidebar() {
 
       <ul className="nav">
         <li className="nav-item">
-          <a href="#" className="nav-link active">
+          <Link to="/app" className={`nav-link ${isActive('/app') ? 'active' : ''}`}>
             <Home size={20} />
             Главная
-          </a>
+          </Link>
         </li>
         <li className="nav-item">
-          <a href="#" className="nav-link">
+          <Link to="/chats" className={`nav-link ${isActive('/chats') ? 'active' : ''}`}>
             <FileText size={20} />
             Чаты
-          </a>
+          </Link>
         </li>
         <li className="nav-item">
           <a href="#" className="nav-link">
@@ -81,6 +100,26 @@ export function Sidebar() {
           </a>
         </li>
       </ul>
+
+      {/* Recent Chats */}
+      {recentChats.length > 0 && (
+        <div className="recent-chats">
+          <div className="recent-chats-header">
+            <span className="recent-chats-title">Последние чаты</span>
+            <Link to="/chats" className="recent-chats-all">Все →</Link>
+          </div>
+          <ul className="recent-chats-list">
+            {recentChats.map((chat) => (
+              <li key={chat.id} className="recent-chat-item">
+                <Link to={`/chat/${chat.id}`} className="recent-chat-link">
+                  <FileText size={14} />
+                  <span className="recent-chat-title">{chat.title}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Profile Section */}
       <div className="profile-section">

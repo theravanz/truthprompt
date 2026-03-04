@@ -2,11 +2,16 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Copy, Check, Trash2, Share2, Download } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Share2, Download, Loader2 } from 'lucide-react';
 import './ChatView.css';
 import { AnimatedPromptInput } from './AnimatedPromptInput';
 import type { CustomModel } from './AnimatedPromptInput';
-import { useTransition } from '../contexts/TransitionContext';
+import { 
+  getChatWithMessages, 
+  addMessage, 
+  createChat,
+  sendToAI
+} from '../lib/chats';
 
 interface Message {
   id: string;
@@ -16,44 +21,27 @@ interface Message {
   model?: string;
 }
 
-interface ChatData {
-  id: string;
-  messages: Message[];
-  createdAt: number;
-  title: string;
-}
-
 export function ChatView() {
   const params = useParams();
   const navigate = useNavigate();
   const chatId = params.chatId;
-  const { transitionData, endTransition } = useTransition();
-  
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatTitle, setChatTitle] = useState('Новый чат');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (chatId) {
       loadChat(chatId);
+    } else {
+      setIsLoading(false);
     }
-    
-    // Если есть данные перехода, используем их
-    if (transitionData && transitionData.chatId === chatId) {
-      const initialMessage: Message = {
-        id: `msg-${Date.now()}`,
-        role: 'user',
-        content: transitionData.prompt,
-        timestamp: Date.now(),
-        model: transitionData.model
-      };
-      setMessages([initialMessage]);
-      endTransition();
-    }
-  }, [chatId, transitionData]);
+  }, [chatId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -63,46 +51,35 @@ export function ChatView() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const loadChat = (id: string) => {
-    const savedChats = localStorage.getItem('truthprompt_chats');
-    if (savedChats) {
-      const chats: ChatData[] = JSON.parse(savedChats);
-      const chat = chats.find(c => c.id === id);
+  const loadChat = async (id: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const chat = await getChatWithMessages(id);
+      
       if (chat) {
-        setMessages(chat.messages);
         setChatTitle(chat.title || 'Чат');
+        const mappedMessages: Message[] = chat.messages.map(msg => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.created_at).getTime(),
+          model: msg.model_name
+        }));
+        setMessages(mappedMessages);
       }
+    } catch (err) {
+      console.error('Error loading chat:', err);
+      setError('Не удалось загрузить чат');
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const saveChat = (updatedMessages: Message[]) => {
-    if (!chatId) return;
-    
-    const savedChats = localStorage.getItem('truthprompt_chats');
-    const chats: ChatData[] = savedChats ? JSON.parse(savedChats) : [];
-    
-    const firstMessage = updatedMessages[0]?.content.slice(0, 50) || 'Новый чат';
-    const title = firstMessage.length > 50 ? firstMessage + '...' : firstMessage;
-    
-    const chatIndex = chats.findIndex(c => c.id === chatId);
-    const chatData: ChatData = {
-      id: chatId,
-      messages: updatedMessages,
-      createdAt: Date.now(),
-      title
-    };
-
-    if (chatIndex >= 0) {
-      chats[chatIndex] = chatData;
-    } else {
-      chats.push(chatData);
-    }
-
-    localStorage.setItem('truthprompt_chats', JSON.stringify(chats));
-    setChatTitle(title);
   };
 
   const handleAnalyze = async (prompt: string, model: CustomModel) => {
+    if (!prompt.trim()) return;
+
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
       role: 'user',
@@ -111,58 +88,70 @@ export function ChatView() {
       model: model.name
     };
 
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    
-    if (!chatId) {
-      const newChatId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      navigate(`/chat/${newChatId}`, { replace: true });
-      
-      setTimeout(() => {
-        saveChatToId(newChatId, updatedMessages);
-      }, 100);
-    } else {
-      saveChat(updatedMessages);
+    let currentChatId = chatId;
+
+    // Если чата нет, создаем новый
+    if (!currentChatId) {
+      try {
+        currentChatId = await createChat(prompt.slice(0, 50) + (prompt.length > 50 ? '...' : ''));
+        navigate(`/chat/${currentChatId}`, { replace: true });
+      } catch (err) {
+        console.error('Error creating chat:', err);
+        setError('Не удалось создать чат');
+        return;
+      }
     }
 
+    // Добавляем сообщение пользователя
+    setMessages(prev => [...prev, userMessage]);
     setIsTyping(true);
 
-    // Имитация ответа AI (здесь будет реальный API вызов)
-    setTimeout(() => {
+    try {
+      // Сохраняем сообщение в Supabase
+      await addMessage(currentChatId, 'user', prompt, {
+        model_name: model.name
+      });
+
+      // Получаем API ключ из localStorage (пользователь должен добавить его в настройках)
+      const apiKey = localStorage.getItem('openrouter_api_key') || '';
+      
+      let aiResponse: string;
+      
+      if (apiKey) {
+        // Отправляем запрос к реальному AI
+        aiResponse = await sendToAI(prompt, model.id, apiKey);
+      } else {
+        // Используем mock-ответ если нет API ключа
+        aiResponse = generateMockResponse(prompt);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+
       const assistantMessage: Message = {
         id: `msg-${Date.now()}-assistant`,
         role: 'assistant',
-        content: generateMockResponse(prompt),
+        content: aiResponse,
         timestamp: Date.now(),
         model: model.name
       };
+
+      setMessages(prev => [...prev, assistantMessage]);
       
-      const finalMessages = [...updatedMessages, assistantMessage];
-      setMessages(finalMessages);
+      // Сохраняем ответ AI в Supabase
+      await addMessage(currentChatId, 'assistant', aiResponse, {
+        model_name: model.name
+      });
+    } catch (err) {
+      console.error('Error getting AI response:', err);
+      const errorMessage: Message = {
+        id: `msg-${Date.now()}-error`,
+        role: 'assistant',
+        content: 'Произошла ошибка при получении ответа. Проверьте API ключ в настройках.',
+        timestamp: Date.now()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-      
-      if (chatId) {
-        saveChat(finalMessages);
-      }
-    }, 1500);
-  };
-
-  const saveChatToId = (id: string, updatedMessages: Message[]) => {
-    const savedChats = localStorage.getItem('truthprompt_chats');
-    const chats: ChatData[] = savedChats ? JSON.parse(savedChats) : [];
-    
-    const firstMessage = updatedMessages[0]?.content.slice(0, 50) || 'Новый чат';
-    const title = firstMessage.length > 50 ? firstMessage + '...' : firstMessage;
-    
-    chats.push({
-      id,
-      messages: updatedMessages,
-      createdAt: Date.now(),
-      title
-    });
-
-    localStorage.setItem('truthprompt_chats', JSON.stringify(chats));
-    setChatTitle(title);
+    }
   };
 
   const generateMockResponse = (_prompt: string): string => {
@@ -183,14 +172,6 @@ export function ChatView() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const deleteMessage = (id: string) => {
-    const updatedMessages = messages.filter(m => m.id !== id);
-    setMessages(updatedMessages);
-    if (chatId) {
-      saveChat(updatedMessages);
-    }
-  };
-
   const shareChat = async () => {
     const shareUrl = `${window.location.origin}${window.location.pathname}`;
     await navigator.clipboard.writeText(shareUrl);
@@ -200,7 +181,7 @@ export function ChatView() {
 
   const exportChat = () => {
     const content = messages.map(m => 
-      `[${m.role.toUpperCase()}] ${m.timestamp}:\n${m.content}\n`
+      `[${m.role.toUpperCase()}] ${new Date(m.timestamp).toLocaleString('ru-RU')}:\n${m.content}\n`
     ).join('\n---\n\n');
     
     const blob = new Blob([content], { type: 'text/markdown' });
@@ -218,6 +199,31 @@ export function ChatView() {
       minute: '2-digit'
     }).format(new Date(timestamp));
   };
+
+  if (isLoading) {
+    return (
+      <div className="chat-view">
+        <div className="chat-loading">
+          <Loader2 className="spinner" size={48} />
+          <p>Загрузка чата...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && messages.length === 0) {
+    return (
+      <div className="chat-view">
+        <div className="chat-error">
+          <h2>Ошибка</h2>
+          <p>{error}</p>
+          <button onClick={() => navigate('/app')} className="btn btn-primary">
+            На главную
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="chat-view">
@@ -325,15 +331,6 @@ export function ChatView() {
                         {copiedId === message.id ? <Check size={14} /> : <Copy size={14} />}
                         {copiedId === message.id && <span className="action-tooltip">Скопировано</span>}
                       </button>
-                      {message.role === 'user' && (
-                        <button
-                          className="message-action-btn"
-                          onClick={() => deleteMessage(message.id)}
-                          type="button"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>

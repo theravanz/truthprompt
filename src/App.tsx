@@ -9,7 +9,7 @@ import Login from './login';
 import Signup from './signup';
 import MainPage from './mainpage';
 import { ChatView } from './components/ChatView';
-import { TransitionProvider } from './contexts/TransitionContext';
+import ChatHistory from './pages/ChatHistory';
 
 // Types
 interface User {
@@ -747,31 +747,37 @@ function LandingPage() {
 function App() {
   return (
     <AuthProvider>
-      <TransitionProvider>
-        <HashRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route
-              path="/app"
-              element={
-                <ProtectedRoute>
-                  <MainPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/chat/:chatId?"
-              element={
-                <ProtectedRoute>
-                  <ChatView />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </HashRouter>
-      </TransitionProvider>
+      <HashRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute>
+                <MainPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat/:chatId?"
+            element={
+              <ProtectedRoute>
+                <ChatView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chats"
+            element={
+              <ProtectedRoute>
+                <ChatHistory />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </HashRouter>
     </AuthProvider>
   );
 }

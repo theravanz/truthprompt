@@ -15,8 +15,8 @@ import './mainpage.css';
 import { Sidebar } from './components/Sidebar';
 import { AnimatedPromptInput } from './components/AnimatedPromptInput';
 import type { CustomModel } from './components/AnimatedPromptInput';
+import { createChat, addMessage } from './lib/chats';
 import { supabase } from './lib/supabase';
-import { useTransition } from './contexts/TransitionContext';
 
 interface GreetingType {
   text: string;
@@ -54,12 +54,10 @@ const greetings: Record<string, GreetingType> = {
 
 const MainPage: React.FC = () => {
   const navigate = useNavigate();
-  const { startTransition } = useTransition();
   const [metricsCollapsed, setMetricsCollapsed] = useState(false);
   const [greeting, setGreeting] = useState<GreetingType | null>(null);
   const [randomSubtitle, setRandomSubtitle] = useState('');
   const [user, setUser] = useState<User | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     updateGreeting();
@@ -92,43 +90,43 @@ const MainPage: React.FC = () => {
     setRandomSubtitle(randomSub);
   };
 
-  const handleAnalyze = (prompt: string, model: CustomModel) => {
+  const handleAnalyze = async (prompt: string, model: CustomModel) => {
     if (!prompt.trim()) return;
-    
-    // Генерируем уникальный ID чата
-    const chatId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Сохраняем первое сообщение в localStorage
-    const savedChats = localStorage.getItem('truthprompt_chats');
-    const chats = savedChats ? JSON.parse(savedChats) : [];
-    
-    const firstMessage = prompt.slice(0, 50) + (prompt.length > 50 ? '...' : '');
-    
-    chats.push({
-      id: chatId,
-      messages: [
-        {
+
+    try {
+      // Создаем чат в Supabase
+      const chatId = await createChat(prompt.slice(0, 50) + (prompt.length > 50 ? '...' : ''));
+
+      // Сохраняем первое сообщение
+      await addMessage(chatId, 'user', prompt, {
+        model_name: model.name
+      });
+
+      // Перенаправляем на чат
+      navigate(`/chat/${chatId}`);
+    } catch (err) {
+      console.error('Error creating chat:', err);
+      // Fallback на localStorage если Supabase недоступен
+      const fallbackChatId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const savedChats = localStorage.getItem('truthprompt_chats');
+      const chats = savedChats ? JSON.parse(savedChats) : [];
+      
+      chats.push({
+        id: fallbackChatId,
+        messages: [{
           id: `msg-${Date.now()}`,
           role: 'user',
           content: prompt,
           timestamp: Date.now(),
           model: model.name
-        }
-      ],
-      createdAt: Date.now(),
-      title: firstMessage
-    });
-    
-    localStorage.setItem('truthprompt_chats', JSON.stringify(chats));
-    
-    // Запускаем анимацию перехода
-    setIsTransitioning(true);
-    startTransition({ prompt, model: model.name, chatId });
-    
-    // Небольшая задержка для анимации
-    setTimeout(() => {
-      navigate(`/chat/${chatId}`);
-    }, 300);
+        }],
+        createdAt: Date.now(),
+        title: prompt.slice(0, 50) + (prompt.length > 50 ? '...' : '')
+      });
+      
+      localStorage.setItem('truthprompt_chats', JSON.stringify(chats));
+      navigate(`/chat/${fallbackChatId}`);
+    }
   };
 
   const GreetingIcon = greeting?.icon || Hand;
@@ -139,7 +137,7 @@ const MainPage: React.FC = () => {
       <div className="orb orb-2"></div>
       <div className="grid-overlay"></div>
 
-      <div className={`dashboard ${isTransitioning ? 'transitioning' : ''}`}>
+      <div className="dashboard">
         {/* Sidebar */}
         <Sidebar />
 
