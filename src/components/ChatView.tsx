@@ -113,7 +113,6 @@ export function ChatView() {
       });
 
       // Получаем API ключ из переменной окружения Vercel или localStorage
-      // Важно: На Vercel переменная должна называться VITE_OPENROUTER_KEY
       const getEnvVar = (name: string) => {
         try {
           return (import.meta as any).env?.[name] || '';
@@ -126,24 +125,12 @@ export function ChatView() {
                      getEnvVar('OPENROUTER_KEY') || 
                      localStorage.getItem('openrouter_api_key') || '';
 
-      console.log('[ChatView] API Key exists:', !!apiKey);
-      console.log('[ChatView] VITE_OPENROUTER_KEY:', !!getEnvVar('VITE_OPENROUTER_KEY'));
-      console.log('[ChatView] OPENROUTER_KEY:', !!getEnvVar('OPENROUTER_KEY'));
-      console.log('[ChatView] localStorage key:', !!localStorage.getItem('openrouter_api_key'));
-      console.log('[ChatView] Model:', model.id);
-
       let aiResponse: string;
 
       if (apiKey) {
-        console.log('[ChatView] Sending request to AI...');
         // Отправляем запрос к реальному AI
         aiResponse = await sendToAI(prompt, model.id, apiKey);
-        console.log('[ChatView] AI response received');
       } else {
-        console.warn('[ChatView] No API key found! Using mock response.');
-        console.warn('[ChatView] To use real AI:');
-        console.warn('[ChatView] 1. Add VITE_OPENROUTER_KEY to Vercel environment variables');
-        console.warn('[ChatView] 2. Or set localStorage: localStorage.setItem("openrouter_api_key", "your-key")');
         // Используем mock-ответ если нет API ключа
         aiResponse = generateMockResponse(prompt);
         await new Promise(resolve => setTimeout(resolve, 1500));

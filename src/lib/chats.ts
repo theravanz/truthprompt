@@ -163,10 +163,6 @@ export async function sendToAI(
   model: string,
   apiKey: string
 ): Promise<string> {
-  console.log('[sendToAI] Sending request to OpenRouter...');
-  console.log('[sendToAI] Model:', model);
-  console.log('[sendToAI] Prompt length:', prompt.length);
-  
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -193,11 +189,8 @@ export async function sendToAI(
       })
     });
 
-    console.log('[sendToAI] Response status:', response.status);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[sendToAI] Error response:', errorText);
       
       let errorMessage = 'Ошибка при запросе к AI';
       try {
@@ -211,11 +204,8 @@ export async function sendToAI(
     }
 
     const data = await response.json();
-    console.log('[sendToAI] Response data:', data);
-    
     return data.choices?.[0]?.message?.content || 'Нет ответа от AI';
   } catch (error: any) {
-    console.error('[sendToAI] Exception:', error.message);
     throw error;
   }
 }
