@@ -94,23 +94,34 @@ export function ChatView() {
     if (!currentChatId) {
       try {
         currentChatId = await createChat(prompt.slice(0, 50) + (prompt.length > 50 ? '...' : ''));
+        // Сохраняем сообщение пользователя в Supabase ДО навигации
+        await addMessage(currentChatId, 'user', prompt, {
+          model_name: model.name
+        });
+        // Добавляем сообщение локально
+        setMessages(prev => [...prev, userMessage]);
+        // Перенаправляем на чат
         navigate(`/chat/${currentChatId}`, { replace: true });
+        // Ждём обновления роута
+        await new Promise(resolve => setTimeout(resolve, 100));
+        setIsTyping(true);
       } catch (err) {
         console.error('Error creating chat:', err);
         setError('Не удалось создать чат');
         return;
       }
-    }
-
-    // Добавляем сообщение пользователя
-    setMessages(prev => [...prev, userMessage]);
-    setIsTyping(true);
-
-    try {
+    } else {
+      // Добавляем сообщение пользователя
+      setMessages(prev => [...prev, userMessage]);
+      setIsTyping(true);
+      
       // Сохраняем сообщение в Supabase
       await addMessage(currentChatId, 'user', prompt, {
         model_name: model.name
       });
+    }
+
+    try {
 
       // Получаем API ключ из переменной окружения Vercel или localStorage
       const getEnvVar = (name: string) => {
