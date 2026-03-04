@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Hand,
   Sun,
@@ -13,6 +14,7 @@ import {
 import './mainpage.css';
 import { Sidebar } from './components/Sidebar';
 import { AnimatedPromptInput } from './components/AnimatedPromptInput';
+import type { CustomModel } from './components/AnimatedPromptInput';
 import { supabase } from './lib/supabase';
 
 interface GreetingType {
@@ -50,10 +52,10 @@ const greetings: Record<string, GreetingType> = {
 };
 
 const MainPage: React.FC = () => {
+  const navigate = useNavigate();
   const [metricsCollapsed, setMetricsCollapsed] = useState(false);
   const [greeting, setGreeting] = useState<GreetingType | null>(null);
   const [randomSubtitle, setRandomSubtitle] = useState('');
-  // const [promptInput, setPromptInput] = useState('');
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -87,10 +89,37 @@ const MainPage: React.FC = () => {
     setRandomSubtitle(randomSub);
   };
 
-  const handleAnalyze = (prompt: string) => {
+  const handleAnalyze = (prompt: string, model: CustomModel) => {
     if (!prompt.trim()) return;
-    console.log('Analyzing prompt:', prompt);
-    // Здесь будет логика анализа
+    
+    // Генерируем уникальный ID чата и перенаправляем
+    const chatId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Сохраняем первое сообщение в localStorage
+    const savedChats = localStorage.getItem('truthprompt_chats');
+    const chats = savedChats ? JSON.parse(savedChats) : [];
+    
+    const firstMessage = prompt.slice(0, 50) + (prompt.length > 50 ? '...' : '');
+    
+    chats.push({
+      id: chatId,
+      messages: [
+        {
+          id: `msg-${Date.now()}`,
+          role: 'user',
+          content: prompt,
+          timestamp: Date.now(),
+          model: model.name
+        }
+      ],
+      createdAt: Date.now(),
+      title: firstMessage
+    });
+    
+    localStorage.setItem('truthprompt_chats', JSON.stringify(chats));
+    
+    // Перенаправляем на страницу чата
+    navigate(`/chat/${chatId}`);
   };
 
   const GreetingIcon = greeting?.icon || Hand;
