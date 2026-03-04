@@ -5,7 +5,7 @@ import { ArrowRight, ChevronDown, Plus, Paperclip, X, Mic, Wand2, Brain, TestTub
 import './AnimatedPromptInput.css';
 import { AIVoiceInput } from './AIVoiceInput';
 
-interface CustomModel {
+export interface CustomModel {
   id: string;
   name: string;
   icon: string;

@@ -8,6 +8,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import Login from './login';
 import Signup from './signup';
 import MainPage from './mainpage';
+import { ChatView } from './components/ChatView';
 
 // Types
 interface User {
@@ -755,6 +756,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <MainPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat/:chatId?"
+            element={
+              <ProtectedRoute>
+                <ChatView />
               </ProtectedRoute>
             }
           />
