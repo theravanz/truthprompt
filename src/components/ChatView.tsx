@@ -3,12 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Copy, Check, Share2, Download, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './ChatView.css';
 import { AnimatedPromptInput } from './AnimatedPromptInput';
 import type { CustomModel } from './AnimatedPromptInput';
-import { 
-  getChatWithMessages, 
-  addMessage, 
+import {
+  getChatWithMessages,
+  addMessage,
   createChat,
   sendToAI
 } from '../lib/chats';
@@ -326,22 +328,62 @@ export function ChatView() {
                       </span>
                       <span className="message-time">{formatTime(message.timestamp)}</span>
                     </div>
-                    <div className="message-text">
-                      {message.content.split('\n').map((line, i) => {
-                        if (line.startsWith('```')) {
-                          return null;
-                        }
-                        if (line.startsWith('**') && line.endsWith('**')) {
-                          return <strong key={i}>{line.slice(2, -2)}</strong>;
-                        }
-                        if (line.startsWith('- ') || line.startsWith('✅') || line.startsWith('1.') || line.startsWith('2.')) {
-                          return <div key={i} className="message-list-item">{line}</div>;
-                        }
-                        if (line.trim()) {
-                          return <p key={i}>{line}</p>;
-                        }
-                        return <br key={i} />;
-                      })}
+                    <div className="message-text markdown-content">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code({ node, className, children, ...props }: any) {
+                            const match = /language-(\w+)/.exec(className || '');
+                            const isInline = !match && !children?.toString().includes('\n');
+                            
+                            if (isInline) {
+                              return <code className={className} {...props}>{children}</code>;
+                            }
+                            
+                            return (
+                              <div className="code-block-wrapper">
+                                <div className="code-block-header">
+                                  <span className="code-language">{match ? match[1] : 'code'}</span>
+                                  <button
+                                    className="copy-code-btn"
+                                    onClick={() => {
+                                      const codeText = String(children).replace(/\n$/, '');
+                                      navigator.clipboard.writeText(codeText);
+                                    }}
+                                    type="button"
+                                  >
+                                    <Copy size={14} />
+                                  </button>
+                                </div>
+                                <pre className={className} {...props}>
+                                  <code>{children}</code>
+                                </pre>
+                              </div>
+                            );
+                          },
+                          p: ({ children }) => <p>{children}</p>,
+                          strong: ({ children }) => <strong>{children}</strong>,
+                          em: ({ children }) => <em>{children}</em>,
+                          ul: ({ children }) => <ul>{children}</ul>,
+                          ol: ({ children }) => <ol>{children}</ol>,
+                          li: ({ children }) => <li>{children}</li>,
+                          h1: ({ children }) => <h1>{children}</h1>,
+                          h2: ({ children }) => <h2>{children}</h2>,
+                          h3: ({ children }) => <h3>{children}</h3>,
+                          h4: ({ children }) => <h4>{children}</h4>,
+                          blockquote: ({ children }) => <blockquote>{children}</blockquote>,
+                          table: ({ children }) => (
+                            <div className="table-wrapper">
+                              <table>{children}</table>
+                            </div>
+                          ),
+                          th: ({ children }) => <th>{children}</th>,
+                          td: ({ children }) => <td>{children}</td>,
+                          hr: () => <hr className="markdown-divider" />,
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
                     </div>
                     <div className="message-actions">
                       <button
