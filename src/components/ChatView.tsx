@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Copy, Check, Share2, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Share2, Download, Loader2, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './ChatView.css';
@@ -34,6 +34,7 @@ export function ChatView() {
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -116,12 +117,16 @@ export function ChatView() {
       // Добавляем сообщение пользователя
       setMessages(prev => [...prev, userMessage]);
       setIsTyping(true);
-      
+
       // Сохраняем сообщение в Supabase
       await addMessage(currentChatId, 'user', prompt, {
         model_name: model.name
       });
     }
+
+    // Создаём AbortController для возможности отмены запроса
+    const controller = new AbortController();
+    setAbortController(controller);
 
     try {
 
@@ -133,16 +138,16 @@ export function ChatView() {
           return '';
         }
       };
-      
-      const apiKey = getEnvVar('VITE_OPENROUTER_KEY') || 
-                     getEnvVar('OPENROUTER_KEY') || 
+
+      const apiKey = getEnvVar('VITE_OPENROUTER_KEY') ||
+                     getEnvVar('OPENROUTER_KEY') ||
                      localStorage.getItem('openrouter_api_key') || '';
 
       let aiResponse: string;
 
       if (apiKey) {
         // Отправляем запрос к реальному AI
-        aiResponse = await sendToAI(prompt, model.id, apiKey);
+        aiResponse = await sendToAI(prompt, model.id, apiKey, controller.signal);
       } else {
         // Используем mock-ответ если нет API ключа
         aiResponse = generateMockResponse(prompt);
@@ -158,22 +163,36 @@ export function ChatView() {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      
+
       // Сохраняем ответ AI в Supabase
       await addMessage(currentChatId, 'assistant', aiResponse, {
         model_name: model.name
       });
-    } catch (err) {
-      console.error('Error getting AI response:', err);
-      const errorMessage: Message = {
-        id: `msg-${Date.now()}-error`,
-        role: 'assistant',
-        content: 'Произошла ошибка при получении ответа. Проверьте API ключ в настройках.',
-        timestamp: Date.now()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+    } catch (err: any) {
+      if (err.message === 'aborted') {
+        // Запрос был отменён пользователем
+        console.log('Request aborted by user');
+      } else {
+        console.error('Error getting AI response:', err);
+        const errorMessage: Message = {
+          id: `msg-${Date.now()}-error`,
+          role: 'assistant',
+          content: 'Произошла ошибка при получении ответа. Проверьте API ключ в настройках.',
+          timestamp: Date.now()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
     } finally {
       setIsTyping(false);
+      setAbortController(null);
+    }
+  };
+
+  const handleStopGeneration = () => {
+    if (abortController) {
+      abortController.abort();
+      setIsTyping(false);
+      setAbortController(null);
     }
   };
 
@@ -409,10 +428,21 @@ export function ChatView() {
                     </div>
                   </div>
                   <div className="message-content">
-                    <div className="typing-indicator">
-                      <span></span>
-                      <span></span>
-                      <span></span>
+                    <div className="typing-content">
+                      <div className="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                      <span className="typing-text">AI генерирует ответ...</span>
+                      <button
+                        className="stop-generation-btn"
+                        onClick={handleStopGeneration}
+                        type="button"
+                        title="Остановить генерацию"
+                      >
+                        <Square size={12} fill="currentColor" />
+                      </button>
                     </div>
                   </div>
                 </div>

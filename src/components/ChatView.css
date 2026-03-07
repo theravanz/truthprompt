@@ -481,6 +481,12 @@
 }
 
 /* Typing Indicator */
+.typing-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .typing-indicator {
   display: flex;
   gap: 6px;
@@ -512,6 +518,37 @@
     transform: translateY(-8px);
     opacity: 1;
   }
+}
+
+.typing-text {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.stop-generation-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stop-generation-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+  transform: scale(1.05);
+}
+
+.stop-generation-btn:active {
+  transform: scale(0.95);
 }
 
 /* Input Wrapper - Fixed at bottom with small gap */

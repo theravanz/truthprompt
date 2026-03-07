@@ -161,7 +161,8 @@ export async function getUserStats(): Promise<{
 export async function sendToAI(
   prompt: string,
   model: string,
-  apiKey: string
+  apiKey: string,
+  signal?: AbortSignal
 ): Promise<string> {
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -172,6 +173,7 @@ export async function sendToAI(
         'HTTP-Referer': window.location.origin,
         'X-Title': 'TruthPrompt'
       },
+      signal,
       body: JSON.stringify({
         model,
         messages: [
@@ -205,7 +207,7 @@ export async function sendToAI(
 
     if (!response.ok) {
       const errorText = await response.text();
-      
+
       let errorMessage = 'Ошибка при запросе к AI';
       try {
         const error = JSON.parse(errorText);
@@ -213,13 +215,16 @@ export async function sendToAI(
       } catch {
         errorMessage = errorText || errorMessage;
       }
-      
+
       throw new Error(errorMessage);
     }
 
     const data = await response.json();
     return data.choices?.[0]?.message?.content || 'Нет ответа от AI';
   } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error('aborted');
+    }
     throw error;
   }
 }
