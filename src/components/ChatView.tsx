@@ -56,8 +56,10 @@ export function ChatView() {
   const [requestQueue, setRequestQueue] = useState<QueuedRequest[]>([]);
   const [generationPlan, setGenerationPlan] = useState<GenerationPlan | null>(null);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+  const [currentChatIdForQueue, setCurrentChatIdForQueue] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const queueProcessingRef = useRef(false);
 
   useEffect(() => {
     if (chatId) {
@@ -175,114 +177,119 @@ export function ChatView() {
     };
 
     setRequestQueue(prev => [...prev, queuedRequest]);
-
-    // Если очередь не обрабатывается, запускаем обработку
-    if (!isProcessingQueue && !isTyping) {
-      processQueue(currentChatId);
-    }
+    setCurrentChatIdForQueue(currentChatId);
   };
 
-  const processQueue = async (chatId: string) => {
+  const processNextRequest = async () => {
+    if (queueProcessingRef.current || isTyping || requestQueue.length === 0) return;
+    
+    const pendingRequest = requestQueue.find(req => req.status === 'pending');
+    if (!pendingRequest || !currentChatIdForQueue) return;
+
+    queueProcessingRef.current = true;
     setIsProcessingQueue(true);
 
-    while (requestQueue.length > 0) {
-      const nextRequest = requestQueue[0];
-      
+    // Обновляем статус запроса
+    setRequestQueue(prev => prev.map(req =>
+      req.id === pendingRequest.id ? { ...req, status: 'processing' } : req
+    ));
+
+    // Генерируем план для этого запроса
+    const plan = generatePlanForRequest(pendingRequest);
+    setGenerationPlan(plan);
+    setIsTyping(true);
+
+    // Создаём AbortController для возможности отмены запроса
+    const controller = new AbortController();
+    setAbortController(controller);
+
+    try {
+      // Получаем API ключ из переменной окружения Vercel или localStorage
+      const getEnvVar = (name: string) => {
+        try {
+          return (import.meta as any).env?.[name] || '';
+        } catch {
+          return '';
+        }
+      };
+
+      const apiKey = getEnvVar('VITE_OPENROUTER_KEY') ||
+                     getEnvVar('OPENROUTER_KEY') ||
+                     localStorage.getItem('openrouter_api_key') || '';
+
+      let aiResponse: string;
+
+      // Формируем промпт с планом работы
+      const planPrompt = buildPlanPrompt(pendingRequest.prompt, plan);
+
+      if (apiKey) {
+        // Отправляем запрос к реальному AI
+        aiResponse = await sendToAI(planPrompt, pendingRequest.model.id, apiKey, controller.signal);
+      } else {
+        // Используем mock-ответ если нет API ключа
+        aiResponse = generateMockResponse(pendingRequest.prompt);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+
+      const assistantMessage: Message = {
+        id: `msg-${Date.now()}-assistant`,
+        role: 'assistant',
+        content: aiResponse,
+        timestamp: Date.now(),
+        model: pendingRequest.model.name
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // Сохраняем ответ AI в Supabase
+      await addMessage(currentChatIdForQueue, 'assistant', aiResponse, {
+        model_name: pendingRequest.model.name
+      });
+
       // Обновляем статус запроса
-      setRequestQueue(prev => prev.map(req => 
-        req.id === nextRequest.id ? { ...req, status: 'processing' } : req
+      setRequestQueue(prev => prev.map(req =>
+        req.id === pendingRequest.id ? { ...req, status: 'completed' } : req
       ));
 
-      // Генерируем план для этого запроса
-      const plan = generatePlanForRequest(nextRequest);
-      setGenerationPlan(plan);
-      setIsTyping(true);
-
-      // Создаём AbortController для возможности отмены запроса
-      const controller = new AbortController();
-      setAbortController(controller);
-
-      try {
-        // Получаем API ключ из переменной окружения Vercel или localStorage
-        const getEnvVar = (name: string) => {
-          try {
-            return (import.meta as any).env?.[name] || '';
-          } catch {
-            return '';
-          }
-        };
-
-        const apiKey = getEnvVar('VITE_OPENROUTER_KEY') ||
-                       getEnvVar('OPENROUTER_KEY') ||
-                       localStorage.getItem('openrouter_api_key') || '';
-
-        let aiResponse: string;
-
-        // Формируем промпт с планом работы
-        const planPrompt = buildPlanPrompt(nextRequest.prompt, plan);
-
-        if (apiKey) {
-          // Отправляем запрос к реальному AI
-          aiResponse = await sendToAI(planPrompt, nextRequest.model.id, apiKey, controller.signal);
-        } else {
-          // Используем mock-ответ если нет API ключа
-          aiResponse = generateMockResponse(nextRequest.prompt);
-          await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-
-        const assistantMessage: Message = {
-          id: `msg-${Date.now()}-assistant`,
-          role: 'assistant',
-          content: aiResponse,
-          timestamp: Date.now(),
-          model: nextRequest.model.name
-        };
-
-        setMessages(prev => [...prev, assistantMessage]);
-
-        // Сохраняем ответ AI в Supabase
-        await addMessage(chatId, 'assistant', aiResponse, {
-          model_name: nextRequest.model.name
-        });
-
-        // Обновляем статус запроса
-        setRequestQueue(prev => prev.map(req => 
-          req.id === nextRequest.id ? { ...req, status: 'completed' } : req
+    } catch (err: any) {
+      if (err.message === 'aborted') {
+        // Запрос был отменён пользователем
+        console.log('Request aborted by user');
+        setRequestQueue(prev => prev.map(req =>
+          req.id === pendingRequest.id ? { ...req, status: 'cancelled' } : req
         ));
-
-      } catch (err: any) {
-        if (err.message === 'aborted') {
-          // Запрос был отменён пользователем
-          console.log('Request aborted by user');
-          setRequestQueue(prev => prev.map(req => 
-            req.id === nextRequest.id ? { ...req, status: 'cancelled' } : req
-          ));
-        } else {
-          console.error('Error getting AI response:', err);
-          const errorMessage: Message = {
-            id: `msg-${Date.now()}-error`,
-            role: 'assistant',
-            content: 'Произошла ошибка при получении ответа. Проверьте API ключ в настройках.',
-            timestamp: Date.now()
-          };
-          setMessages(prev => [...prev, errorMessage]);
-          
-          setRequestQueue(prev => prev.map(req => 
-            req.id === nextRequest.id ? { ...req, status: 'cancelled' } : req
-          ));
-        }
-      } finally {
-        setIsTyping(false);
-        setAbortController(null);
-        setGenerationPlan(null);
+      } else {
+        console.error('Error getting AI response:', err);
+        const errorMessage: Message = {
+          id: `msg-${Date.now()}-error`,
+          role: 'assistant',
+          content: 'Произошла ошибка при получении ответа. Проверьте API ключ в настройках.',
+          timestamp: Date.now()
+        };
+        setMessages(prev => [...prev, errorMessage]);
         
-        // Удаляем обработанный запрос из очереди
-        setRequestQueue(prev => prev.filter(req => req.id !== nextRequest.id));
+        setRequestQueue(prev => prev.map(req =>
+          req.id === pendingRequest.id ? { ...req, status: 'cancelled' } : req
+        ));
       }
+    } finally {
+      setIsTyping(false);
+      setAbortController(null);
+      setGenerationPlan(null);
+      queueProcessingRef.current = false;
+      
+      // Удаляем обработанный запрос из очереди
+      setRequestQueue(prev => prev.filter(req => req.id !== pendingRequest.id));
+      setIsProcessingQueue(false);
     }
-
-    setIsProcessingQueue(false);
   };
+
+  // Обрабатываем очередь при изменении requestQueue
+  useEffect(() => {
+    if (requestQueue.length > 0 && !isTyping && currentChatIdForQueue) {
+      processNextRequest();
+    }
+  }, [requestQueue, isTyping, currentChatIdForQueue]);
 
   const generatePlanForRequest = (request: QueuedRequest): GenerationPlan => {
     // Генерируем план на основе запроса
@@ -327,13 +334,7 @@ ${prompt}
   };
 
   const handleCancelQueuedRequest = (requestId: string) => {
-    setRequestQueue(prev => prev.map(req => 
-      req.id === requestId ? { ...req, status: 'cancelled' } : req
-    ));
-  };
-
-  const handleClearQueue = () => {
-    setRequestQueue(prev => prev.filter(req => req.status === 'processing'));
+    setRequestQueue(prev => prev.filter(req => req.id !== requestId));
   };
 
   const generateMockResponse = (_prompt: string): string => {
@@ -613,22 +614,12 @@ ${prompt}
                       <Loader2 className={`queue-icon ${isProcessingQueue ? 'spinning' : ''}`} size={16} />
                       <span>Очередь запросов ({requestQueue.length})</span>
                     </div>
-                    {requestQueue.some(req => req.status === 'pending') && (
-                      <button
-                        className="clear-queue-btn"
-                        onClick={handleClearQueue}
-                        type="button"
-                        title="Очистить очередь"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
                   </div>
                   <div className="queue-list">
                     {requestQueue.map((request, index) => (
                       <div
                         key={request.id}
-                        className={`queue-item ${request.status} ${index === 0 && isProcessingQueue ? 'processing' : ''}`}
+                        className={`queue-item ${request.status} ${index === 0 && isTyping ? 'processing' : ''}`}
                       >
                         <div className="queue-item-content">
                           <span className="queue-item-prompt">{request.prompt.slice(0, 50)}{request.prompt.length > 50 ? '...' : ''}</span>
