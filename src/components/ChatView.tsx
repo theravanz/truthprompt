@@ -60,6 +60,7 @@ export function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const queueProcessingRef = useRef(false);
+  const requestQueueRef = useRef<QueuedRequest[]>([]);
 
   useEffect(() => {
     if (chatId) {
@@ -176,23 +177,34 @@ export function ChatView() {
       status: 'pending'
     };
 
-    setRequestQueue(prev => [...prev, queuedRequest]);
+    // Обновляем state и ref
+    setRequestQueue(prev => {
+      const newQueue = [...prev, queuedRequest];
+      requestQueueRef.current = newQueue;
+      return newQueue;
+    });
+    
     setCurrentChatIdForQueue(currentChatId);
   };
 
   const processNextRequest = async () => {
-    if (queueProcessingRef.current || isTyping || requestQueue.length === 0) return;
-    
-    const pendingRequest = requestQueue.find(req => req.status === 'pending');
-    if (!pendingRequest || !currentChatIdForQueue) return;
+    // Проверяем, что можно обрабатывать
+    if (queueProcessingRef.current || requestQueueRef.current.length === 0 || !currentChatIdForQueue) {
+      return;
+    }
 
+    // Находим первый pending запрос
+    const pendingIndex = requestQueueRef.current.findIndex(req => req.status === 'pending');
+    if (pendingIndex === -1) return;
+
+    const pendingRequest = requestQueueRef.current[pendingIndex];
+    
     queueProcessingRef.current = true;
     setIsProcessingQueue(true);
 
-    // Обновляем статус запроса
-    setRequestQueue(prev => prev.map(req =>
-      req.id === pendingRequest.id ? { ...req, status: 'processing' } : req
-    ));
+    // Обновляем статус запроса в ref и state
+    requestQueueRef.current[pendingIndex].status = 'processing';
+    setRequestQueue([...requestQueueRef.current]);
 
     // Генерируем план для этого запроса
     const plan = generatePlanForRequest(pendingRequest);
@@ -247,17 +259,15 @@ export function ChatView() {
       });
 
       // Обновляем статус запроса
-      setRequestQueue(prev => prev.map(req =>
-        req.id === pendingRequest.id ? { ...req, status: 'completed' } : req
-      ));
+      requestQueueRef.current[pendingIndex].status = 'completed';
+      setRequestQueue([...requestQueueRef.current]);
 
     } catch (err: any) {
       if (err.message === 'aborted') {
         // Запрос был отменён пользователем
         console.log('Request aborted by user');
-        setRequestQueue(prev => prev.map(req =>
-          req.id === pendingRequest.id ? { ...req, status: 'cancelled' } : req
-        ));
+        requestQueueRef.current[pendingIndex].status = 'cancelled';
+        setRequestQueue([...requestQueueRef.current]);
       } else {
         console.error('Error getting AI response:', err);
         const errorMessage: Message = {
@@ -268,28 +278,37 @@ export function ChatView() {
         };
         setMessages(prev => [...prev, errorMessage]);
         
-        setRequestQueue(prev => prev.map(req =>
-          req.id === pendingRequest.id ? { ...req, status: 'cancelled' } : req
-        ));
+        requestQueueRef.current[pendingIndex].status = 'cancelled';
+        setRequestQueue([...requestQueueRef.current]);
       }
     } finally {
       setIsTyping(false);
       setAbortController(null);
       setGenerationPlan(null);
-      queueProcessingRef.current = false;
       
-      // Удаляем обработанный запрос из очереди
-      setRequestQueue(prev => prev.filter(req => req.id !== pendingRequest.id));
+      // Удаляем обработанный запрос из ref
+      requestQueueRef.current = requestQueueRef.current.filter(req => req.id !== pendingRequest.id);
+      setRequestQueue([...requestQueueRef.current]);
+      
+      queueProcessingRef.current = false;
       setIsProcessingQueue(false);
+      
+      // Запускаем обработку следующего запроса
+      if (requestQueueRef.current.length > 0) {
+        setTimeout(() => processNextRequest(), 100);
+      }
     }
   };
 
-  // Обрабатываем очередь при изменении requestQueue
+  // Запускаем обработку при появлении новых запросов
   useEffect(() => {
-    if (requestQueue.length > 0 && !isTyping && currentChatIdForQueue) {
+    if (requestQueueRef.current.some(req => req.status === 'pending') && 
+        !queueProcessingRef.current && 
+        !isTyping && 
+        currentChatIdForQueue) {
       processNextRequest();
     }
-  }, [requestQueue, isTyping, currentChatIdForQueue]);
+  }, [requestQueue, currentChatIdForQueue]);
 
   const generatePlanForRequest = (request: QueuedRequest): GenerationPlan => {
     // Генерируем план на основе запроса
@@ -334,7 +353,11 @@ ${prompt}
   };
 
   const handleCancelQueuedRequest = (requestId: string) => {
-    setRequestQueue(prev => prev.filter(req => req.id !== requestId));
+    const index = requestQueueRef.current.findIndex(req => req.id === requestId);
+    if (index !== -1 && requestQueueRef.current[index].status === 'pending') {
+      requestQueueRef.current.splice(index, 1);
+      setRequestQueue([...requestQueueRef.current]);
+    }
   };
 
   const generateMockResponse = (_prompt: string): string => {
