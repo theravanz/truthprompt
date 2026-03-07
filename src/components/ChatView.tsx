@@ -129,6 +129,24 @@ export function ChatView() {
   const handleAnalyze = async (prompt: string, model: CustomModel) => {
     if (!prompt.trim()) return;
 
+    // Если уже идёт генерация — просто добавляем в очередь
+    if (isTyping || queueProcessingRef.current) {
+      const queuedRequest: QueuedRequest = {
+        id: `req-${Date.now()}`,
+        prompt,
+        model,
+        timestamp: Date.now(),
+        status: 'pending'
+      };
+      
+      setRequestQueue(prev => {
+        const newQueue = [...prev, queuedRequest];
+        requestQueueRef.current = newQueue;
+        return newQueue;
+      });
+      return;
+    }
+
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
       role: 'user',
@@ -189,7 +207,11 @@ export function ChatView() {
 
   const processNextRequest = async () => {
     // Проверяем, что можно обрабатывать
-    if (queueProcessingRef.current || requestQueueRef.current.length === 0 || !currentChatIdForQueue) {
+    if (queueProcessingRef.current || isTyping) {
+      return;
+    }
+    
+    if (requestQueueRef.current.length === 0 || !currentChatIdForQueue) {
       return;
     }
 
@@ -199,12 +221,11 @@ export function ChatView() {
 
     const pendingRequest = requestQueueRef.current[pendingIndex];
     
+    // Сразу помечаем как processing чтобы предотвратить повторную обработку
     queueProcessingRef.current = true;
-    setIsProcessingQueue(true);
-
-    // Обновляем статус запроса в ref и state
     requestQueueRef.current[pendingIndex].status = 'processing';
     setRequestQueue([...requestQueueRef.current]);
+    setIsProcessingQueue(true);
 
     // Генерируем план для этого запроса
     const plan = generatePlanForRequest(pendingRequest);
@@ -258,16 +279,10 @@ export function ChatView() {
         model_name: pendingRequest.model.name
       });
 
-      // Обновляем статус запроса
-      requestQueueRef.current[pendingIndex].status = 'completed';
-      setRequestQueue([...requestQueueRef.current]);
-
     } catch (err: any) {
       if (err.message === 'aborted') {
         // Запрос был отменён пользователем
         console.log('Request aborted by user');
-        requestQueueRef.current[pendingIndex].status = 'cancelled';
-        setRequestQueue([...requestQueueRef.current]);
       } else {
         console.error('Error getting AI response:', err);
         const errorMessage: Message = {
@@ -277,38 +292,33 @@ export function ChatView() {
           timestamp: Date.now()
         };
         setMessages(prev => [...prev, errorMessage]);
-        
-        requestQueueRef.current[pendingIndex].status = 'cancelled';
-        setRequestQueue([...requestQueueRef.current]);
       }
     } finally {
-      setIsTyping(false);
-      setAbortController(null);
-      setGenerationPlan(null);
-      
       // Удаляем обработанный запрос из ref
       requestQueueRef.current = requestQueueRef.current.filter(req => req.id !== pendingRequest.id);
       setRequestQueue([...requestQueueRef.current]);
       
+      setIsTyping(false);
+      setAbortController(null);
+      setGenerationPlan(null);
       queueProcessingRef.current = false;
       setIsProcessingQueue(false);
-      
-      // Запускаем обработку следующего запроса
-      if (requestQueueRef.current.length > 0) {
-        setTimeout(() => processNextRequest(), 100);
-      }
     }
   };
 
   // Запускаем обработку при появлении новых запросов
   useEffect(() => {
-    if (requestQueueRef.current.some(req => req.status === 'pending') && 
+    // Проверяем наличие pending запросов
+    const pendingCount = requestQueueRef.current.filter(r => r.status === 'pending').length;
+    
+    // Запускаем обработку только если есть pending запросы и ничего не обрабатывается
+    if (pendingCount > 0 && 
         !queueProcessingRef.current && 
         !isTyping && 
         currentChatIdForQueue) {
       processNextRequest();
     }
-  }, [requestQueue, currentChatIdForQueue]);
+  }, [requestQueue, currentChatIdForQueue, isTyping]);
 
   const generatePlanForRequest = (request: QueuedRequest): GenerationPlan => {
     // Генерируем план на основе запроса
