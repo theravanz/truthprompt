@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Copy, Check, Share2, Download, Loader2, Square } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Share2, Download, Loader2, Square, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './ChatView.css';
@@ -23,6 +23,24 @@ interface Message {
   model?: string;
 }
 
+interface QueuedRequest {
+  id: string;
+  prompt: string;
+  model: CustomModel;
+  timestamp: number;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+}
+
+interface GenerationPlan {
+  requestId: string;
+  steps: Array<{
+    id: number;
+    description: string;
+    status: 'pending' | 'in_progress' | 'completed';
+  }>;
+  currentStep: number;
+}
+
 export function ChatView() {
   const params = useParams();
   const navigate = useNavigate();
@@ -35,6 +53,9 @@ export function ChatView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [requestQueue, setRequestQueue] = useState<QueuedRequest[]>([]);
+  const [generationPlan, setGenerationPlan] = useState<GenerationPlan | null>(null);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +69,29 @@ export function ChatView() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, requestQueue]);
+
+  // Обновление текущего шага плана во время генерации
+  useEffect(() => {
+    if (generationPlan && isTyping) {
+      const interval = setInterval(() => {
+        setGenerationPlan(prev => {
+          if (!prev) return null;
+          const nextStep = Math.min(prev.currentStep + 1, prev.steps.length);
+          return {
+            ...prev,
+            currentStep: nextStep,
+            steps: prev.steps.map((step, index) => ({
+              ...step,
+              status: index < nextStep ? 'completed' : index === nextStep ? 'in_progress' : 'pending'
+            }))
+          };
+        });
+      }, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isTyping, generationPlan]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -107,7 +150,6 @@ export function ChatView() {
         navigate(`/chat/${currentChatId}`, { replace: true });
         // Ждём обновления роута
         await new Promise(resolve => setTimeout(resolve, 100));
-        setIsTyping(true);
       } catch (err) {
         console.error('Error creating chat:', err);
         setError('Не удалось создать чат');
@@ -116,7 +158,6 @@ export function ChatView() {
     } else {
       // Добавляем сообщение пользователя
       setMessages(prev => [...prev, userMessage]);
-      setIsTyping(true);
 
       // Сохраняем сообщение в Supabase
       await addMessage(currentChatId, 'user', prompt, {
@@ -124,68 +165,156 @@ export function ChatView() {
       });
     }
 
-    // Создаём AbortController для возможности отмены запроса
-    const controller = new AbortController();
-    setAbortController(controller);
+    // Создаём запрос и добавляем в очередь
+    const queuedRequest: QueuedRequest = {
+      id: `req-${Date.now()}`,
+      prompt,
+      model,
+      timestamp: Date.now(),
+      status: 'pending'
+    };
 
-    try {
+    setRequestQueue(prev => [...prev, queuedRequest]);
 
-      // Получаем API ключ из переменной окружения Vercel или localStorage
-      const getEnvVar = (name: string) => {
-        try {
-          return (import.meta as any).env?.[name] || '';
-        } catch {
-          return '';
-        }
-      };
-
-      const apiKey = getEnvVar('VITE_OPENROUTER_KEY') ||
-                     getEnvVar('OPENROUTER_KEY') ||
-                     localStorage.getItem('openrouter_api_key') || '';
-
-      let aiResponse: string;
-
-      if (apiKey) {
-        // Отправляем запрос к реальному AI
-        aiResponse = await sendToAI(prompt, model.id, apiKey, controller.signal);
-      } else {
-        // Используем mock-ответ если нет API ключа
-        aiResponse = generateMockResponse(prompt);
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      }
-
-      const assistantMessage: Message = {
-        id: `msg-${Date.now()}-assistant`,
-        role: 'assistant',
-        content: aiResponse,
-        timestamp: Date.now(),
-        model: model.name
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
-      // Сохраняем ответ AI в Supabase
-      await addMessage(currentChatId, 'assistant', aiResponse, {
-        model_name: model.name
-      });
-    } catch (err: any) {
-      if (err.message === 'aborted') {
-        // Запрос был отменён пользователем
-        console.log('Request aborted by user');
-      } else {
-        console.error('Error getting AI response:', err);
-        const errorMessage: Message = {
-          id: `msg-${Date.now()}-error`,
-          role: 'assistant',
-          content: 'Произошла ошибка при получении ответа. Проверьте API ключ в настройках.',
-          timestamp: Date.now()
-        };
-        setMessages(prev => [...prev, errorMessage]);
-      }
-    } finally {
-      setIsTyping(false);
-      setAbortController(null);
+    // Если очередь не обрабатывается, запускаем обработку
+    if (!isProcessingQueue && !isTyping) {
+      processQueue(currentChatId);
     }
+  };
+
+  const processQueue = async (chatId: string) => {
+    setIsProcessingQueue(true);
+
+    while (requestQueue.length > 0) {
+      const nextRequest = requestQueue[0];
+      
+      // Обновляем статус запроса
+      setRequestQueue(prev => prev.map(req => 
+        req.id === nextRequest.id ? { ...req, status: 'processing' } : req
+      ));
+
+      // Генерируем план для этого запроса
+      const plan = generatePlanForRequest(nextRequest);
+      setGenerationPlan(plan);
+      setIsTyping(true);
+
+      // Создаём AbortController для возможности отмены запроса
+      const controller = new AbortController();
+      setAbortController(controller);
+
+      try {
+        // Получаем API ключ из переменной окружения Vercel или localStorage
+        const getEnvVar = (name: string) => {
+          try {
+            return (import.meta as any).env?.[name] || '';
+          } catch {
+            return '';
+          }
+        };
+
+        const apiKey = getEnvVar('VITE_OPENROUTER_KEY') ||
+                       getEnvVar('OPENROUTER_KEY') ||
+                       localStorage.getItem('openrouter_api_key') || '';
+
+        let aiResponse: string;
+
+        // Формируем промпт с планом работы
+        const planPrompt = buildPlanPrompt(nextRequest.prompt, plan);
+
+        if (apiKey) {
+          // Отправляем запрос к реальному AI
+          aiResponse = await sendToAI(planPrompt, nextRequest.model.id, apiKey, controller.signal);
+        } else {
+          // Используем mock-ответ если нет API ключа
+          aiResponse = generateMockResponse(nextRequest.prompt);
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+
+        const assistantMessage: Message = {
+          id: `msg-${Date.now()}-assistant`,
+          role: 'assistant',
+          content: aiResponse,
+          timestamp: Date.now(),
+          model: nextRequest.model.name
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+
+        // Сохраняем ответ AI в Supabase
+        await addMessage(chatId, 'assistant', aiResponse, {
+          model_name: nextRequest.model.name
+        });
+
+        // Обновляем статус запроса
+        setRequestQueue(prev => prev.map(req => 
+          req.id === nextRequest.id ? { ...req, status: 'completed' } : req
+        ));
+
+      } catch (err: any) {
+        if (err.message === 'aborted') {
+          // Запрос был отменён пользователем
+          console.log('Request aborted by user');
+          setRequestQueue(prev => prev.map(req => 
+            req.id === nextRequest.id ? { ...req, status: 'cancelled' } : req
+          ));
+        } else {
+          console.error('Error getting AI response:', err);
+          const errorMessage: Message = {
+            id: `msg-${Date.now()}-error`,
+            role: 'assistant',
+            content: 'Произошла ошибка при получении ответа. Проверьте API ключ в настройках.',
+            timestamp: Date.now()
+          };
+          setMessages(prev => [...prev, errorMessage]);
+          
+          setRequestQueue(prev => prev.map(req => 
+            req.id === nextRequest.id ? { ...req, status: 'cancelled' } : req
+          ));
+        }
+      } finally {
+        setIsTyping(false);
+        setAbortController(null);
+        setGenerationPlan(null);
+        
+        // Удаляем обработанный запрос из очереди
+        setRequestQueue(prev => prev.filter(req => req.id !== nextRequest.id));
+      }
+    }
+
+    setIsProcessingQueue(false);
+  };
+
+  const generatePlanForRequest = (request: QueuedRequest): GenerationPlan => {
+    // Генерируем план на основе запроса
+    const steps = [
+      { id: 1, description: 'Анализ запроса', status: 'pending' as const },
+      { id: 2, description: 'Формирование структуры ответа', status: 'pending' as const },
+      { id: 3, description: 'Генерация решения', status: 'pending' as const },
+      { id: 4, description: 'Проверка и оптимизация', status: 'pending' as const },
+    ];
+
+    return {
+      requestId: request.id,
+      steps,
+      currentStep: 0
+    };
+  };
+
+  const buildPlanPrompt = (prompt: string, plan: GenerationPlan): string => {
+    const planDescription = plan.steps.map((step, index) => 
+      `${index + 1}. ${step.description}`
+    ).join('\n');
+
+    return `Ты TruthPrompt — AI ассистент для анализа промптов и код-ревью.
+
+ВАЖНО: Работай строго по следующему плану:
+
+${planDescription}
+
+Запрос пользователя:
+${prompt}
+
+Следуй плану шаг за шагом, предоставляя подробный и качественный ответ.`;
   };
 
   const handleStopGeneration = () => {
@@ -193,7 +322,18 @@ export function ChatView() {
       abortController.abort();
       setIsTyping(false);
       setAbortController(null);
+      setGenerationPlan(null);
     }
+  };
+
+  const handleCancelQueuedRequest = (requestId: string) => {
+    setRequestQueue(prev => prev.map(req => 
+      req.id === requestId ? { ...req, status: 'cancelled' } : req
+    ));
+  };
+
+  const handleClearQueue = () => {
+    setRequestQueue(prev => prev.filter(req => req.status === 'processing'));
   };
 
   const generateMockResponse = (_prompt: string): string => {
@@ -417,8 +557,9 @@ export function ChatView() {
                   </div>
                 </div>
               ))}
-              
-              {isTyping && (
+
+              {/* Отображение плана генерации */}
+              {generationPlan && (
                 <div className="message assistant typing">
                   <div className="message-avatar">
                     <div className="avatar-ai">
@@ -428,25 +569,92 @@ export function ChatView() {
                     </div>
                   </div>
                   <div className="message-content">
-                    <div className="typing-content">
-                      <div className="typing-indicator">
-                        <span></span>
-                        <span></span>
-                        <span></span>
+                    <div className="plan-container">
+                      <div className="plan-header">
+                        <span className="plan-title">План работы AI</span>
+                        <button
+                          className="stop-generation-btn"
+                          onClick={handleStopGeneration}
+                          type="button"
+                          title="Остановить генерацию"
+                        >
+                          <Square size={12} fill="currentColor" />
+                        </button>
                       </div>
-                      <span className="typing-text">AI генерирует ответ...</span>
-                      <button
-                        className="stop-generation-btn"
-                        onClick={handleStopGeneration}
-                        type="button"
-                        title="Остановить генерацию"
-                      >
-                        <Square size={12} fill="currentColor" />
-                      </button>
+                      <div className="plan-steps">
+                        {generationPlan.steps.map((step, index) => (
+                          <div
+                            key={step.id}
+                            className={`plan-step ${index < generationPlan.currentStep ? 'completed' : ''} ${index === generationPlan.currentStep ? 'active' : ''}`}
+                          >
+                            <div className="plan-step-indicator">
+                              {index < generationPlan.currentStep ? (
+                                <Check size={12} />
+                              ) : index === generationPlan.currentStep ? (
+                                <div className="step-pulse"></div>
+                              ) : (
+                                <span className="step-number">{index + 1}</span>
+                              )}
+                            </div>
+                            <span className="plan-step-text">{step.description}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
+
+              {/* Отображение очереди запросов */}
+              {requestQueue.length > 0 && (
+                <div className="queue-container">
+                  <div className="queue-header">
+                    <div className="queue-title">
+                      <Loader2 className={`queue-icon ${isProcessingQueue ? 'spinning' : ''}`} size={16} />
+                      <span>Очередь запросов ({requestQueue.length})</span>
+                    </div>
+                    {requestQueue.some(req => req.status === 'pending') && (
+                      <button
+                        className="clear-queue-btn"
+                        onClick={handleClearQueue}
+                        type="button"
+                        title="Очистить очередь"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="queue-list">
+                    {requestQueue.map((request, index) => (
+                      <div
+                        key={request.id}
+                        className={`queue-item ${request.status} ${index === 0 && isProcessingQueue ? 'processing' : ''}`}
+                      >
+                        <div className="queue-item-content">
+                          <span className="queue-item-prompt">{request.prompt.slice(0, 50)}{request.prompt.length > 50 ? '...' : ''}</span>
+                          <span className={`queue-item-status status-${request.status}`}>
+                            {request.status === 'pending' && 'Ожидает'}
+                            {request.status === 'processing' && 'Выполняется'}
+                            {request.status === 'completed' && 'Готов'}
+                            {request.status === 'cancelled' && 'Отменён'}
+                          </span>
+                        </div>
+                        {request.status === 'pending' && (
+                          <button
+                            className="cancel-request-btn"
+                            onClick={() => handleCancelQueuedRequest(request.id)}
+                            type="button"
+                            title="Отменить запрос"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </>
           )}
