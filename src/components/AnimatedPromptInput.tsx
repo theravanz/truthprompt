@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowRight, ChevronDown, Plus, Paperclip, X, Mic, Wand2, Brain, TestTube, Globe, Code2, Lightbulb } from 'lucide-react';
+import { ArrowRight, ChevronDown, Plus, Paperclip, X, Mic, Wand2, Brain, CheckSquare, Code2, Lightbulb } from 'lucide-react';
 import './AnimatedPromptInput.css';
 import { AIVoiceInput } from './AIVoiceInput';
 
@@ -74,7 +74,7 @@ const DEFAULT_MODELS: CustomModel[] = [
 ];
 
 interface AnimatedPromptInputProps {
-  onAnalyze: (prompt: string, model: CustomModel) => void;
+  onAnalyze: (prompt: string, model: CustomModel, selectedTools: string[]) => void;
 }
 
 export function AnimatedPromptInput({ onAnalyze }: AnimatedPromptInputProps) {
@@ -115,7 +115,7 @@ export function AnimatedPromptInput({ onAnalyze }: AnimatedPromptInputProps) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && value.trim()) {
       e.preventDefault();
-      onAnalyze(value, selectedModel);
+      onAnalyze(value, selectedModel, selectedTools);
       setValue('');
       adjustHeight(true);
     }
@@ -123,7 +123,7 @@ export function AnimatedPromptInput({ onAnalyze }: AnimatedPromptInputProps) {
 
   const handleSubmit = () => {
     if (!value.trim()) return;
-    onAnalyze(value, selectedModel);
+    onAnalyze(value, selectedModel, selectedTools);
     setValue('');
     adjustHeight(true);
   };
@@ -172,11 +172,10 @@ export function AnimatedPromptInput({ onAnalyze }: AnimatedPromptInputProps) {
   };
 
   const TOOLS = [
-    { id: 'think', label: 'Думать', icon: Brain, description: 'Глубокий анализ задачи' },
-    { id: 'testing', label: 'Тестинг', icon: TestTube, description: 'Написание тестов' },
-    { id: 'search', label: 'Поиск', icon: Globe, description: 'Поиск в интернете' },
-    { id: 'review', label: 'Code Review', icon: Code2, description: 'Анализ кода' },
-    { id: 'explain', label: 'Объяснить', icon: Lightbulb, description: 'Подробное объяснение' },
+    { id: 'analyze', label: 'Анализ промпта', icon: Brain, description: 'Глубокий анализ задачи перед выполнением' },
+    { id: 'clarify', label: 'Уточнение', icon: Lightbulb, description: '1-2 уточняющих вопроса для проверки логики' },
+    { id: 'todo', label: 'To-Do план', icon: CheckSquare, description: 'ИИ составляет план выполнения по шагам' },
+    { id: 'review', label: 'Критический анализ', icon: Code2, description: 'Поиск ошибок, уязвимостей и заблуждений' },
   ];
 
   return (

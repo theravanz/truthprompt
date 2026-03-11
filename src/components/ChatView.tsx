@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Copy, Check, Share2, Download, Loader2, Square, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -14,6 +14,12 @@ import {
   createChat,
   sendToAI
 } from '../lib/chats';
+import { PromptAnalysis } from './PromptAnalysis';
+import { ClarifyingQuestions } from './ClarifyingQuestions';
+import { ToDoPlan } from './ToDoPlan';
+import { CodeReview } from './CodeReview';
+import { AIAssessment } from './AIAssessment';
+import { ImprovementSuggestions } from './ImprovementSuggestions';
 
 interface Message {
   id: string;
@@ -21,12 +27,21 @@ interface Message {
   content: string;
   timestamp: number;
   model?: string;
+  tools?: {
+    analysis?: { score: number; strengths: string[]; weaknesses: string[]; summary: string };
+    questions?: string[];
+    todoPlan?: Array<{ id: number; description: string; status: 'pending' | 'in_progress' | 'completed' }>;
+    codeReview?: Array<{ severity: 'critical' | 'warning' | 'info'; title: string; description: string }>;
+    assessment?: { aiScore: number; usefulness: number; accuracy: number; completeness: number };
+    suggestions?: Array<{ id: number; title: string; description: string }>;
+  };
 }
 
 interface QueuedRequest {
   id: string;
   prompt: string;
   model: CustomModel;
+  selectedTools: string[];
   timestamp: number;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
 }
@@ -67,6 +82,40 @@ export function ChatView() {
       loadChat(chatId);
     } else {
       setIsLoading(false);
+    }
+  }, [chatId]);
+
+  // Проверяем initial_prompt из sessionStorage при первом рендере
+  useEffect(() => {
+    const initialPromptData = sessionStorage.getItem('initial_prompt');
+    if (initialPromptData && chatId) {
+      try {
+        const { prompt, model, selectedTools = [] } = JSON.parse(initialPromptData);
+
+        // Добавляем запрос в очередь
+        const queuedRequest: QueuedRequest = {
+          id: `req-${Date.now()}`,
+          prompt,
+          model,
+          selectedTools,
+          timestamp: Date.now(),
+          status: 'pending'
+        };
+
+        setRequestQueue(prev => {
+          const newQueue = [...prev, queuedRequest];
+          requestQueueRef.current = newQueue;
+          return newQueue;
+        });
+
+        setCurrentChatIdForQueue(chatId);
+
+        // Очищаем sessionStorage
+        sessionStorage.removeItem('initial_prompt');
+      } catch (err) {
+        console.error('Error parsing initial prompt:', err);
+        sessionStorage.removeItem('initial_prompt');
+      }
     }
   }, [chatId]);
 
@@ -126,7 +175,7 @@ export function ChatView() {
     }
   };
 
-  const handleAnalyze = async (prompt: string, model: CustomModel) => {
+  const handleAnalyze = async (prompt: string, model: CustomModel, selectedTools: string[] = []) => {
     if (!prompt.trim()) return;
 
     // Если уже идёт генерация — просто добавляем в очередь
@@ -135,10 +184,11 @@ export function ChatView() {
         id: `req-${Date.now()}`,
         prompt,
         model,
+        selectedTools,
         timestamp: Date.now(),
         status: 'pending'
       };
-      
+
       setRequestQueue(prev => {
         const newQueue = [...prev, queuedRequest];
         requestQueueRef.current = newQueue;
@@ -163,7 +213,8 @@ export function ChatView() {
         currentChatId = await createChat(prompt.slice(0, 50) + (prompt.length > 50 ? '...' : ''));
         // Сохраняем сообщение пользователя в Supabase ДО навигации
         await addMessage(currentChatId, 'user', prompt, {
-          model_name: model.name
+          model_name: model.name,
+          metadata: { tools: selectedTools }
         });
         // Добавляем сообщение локально
         setMessages(prev => [...prev, userMessage]);
@@ -182,7 +233,8 @@ export function ChatView() {
 
       // Сохраняем сообщение в Supabase
       await addMessage(currentChatId, 'user', prompt, {
-        model_name: model.name
+        model_name: model.name,
+        metadata: { tools: selectedTools }
       });
     }
 
@@ -191,6 +243,7 @@ export function ChatView() {
       id: `req-${Date.now()}`,
       prompt,
       model,
+      selectedTools,
       timestamp: Date.now(),
       status: 'pending'
     };
@@ -201,16 +254,202 @@ export function ChatView() {
       requestQueueRef.current = newQueue;
       return newQueue;
     });
-    
+
     setCurrentChatIdForQueue(currentChatId);
   };
 
-  const processNextRequest = async () => {
+  const generatePlanForRequest = useCallback((request: QueuedRequest): GenerationPlan => {
+    // Генерируем план на основе запроса
+    const steps = [
+      { id: 1, description: 'Анализ запроса', status: 'pending' as const },
+      { id: 2, description: 'Формирование структуры ответа', status: 'pending' as const },
+      { id: 3, description: 'Генерация решения', status: 'pending' as const },
+      { id: 4, description: 'Проверка и оптимизация', status: 'pending' as const },
+    ];
+
+    return {
+      requestId: request.id,
+      steps,
+      currentStep: 0
+    };
+  }, []);
+
+  const buildPlanPrompt = useCallback((prompt: string, plan: GenerationPlan, selectedTools: string[] = []): string => {
+    const planDescription = plan.steps.map((step, index) =>
+      `${index + 1}. ${step.description}`
+    ).join('\n');
+
+    // Формируем инструкции для выбранных инструментов
+    const toolInstructions = selectedTools.map(toolId => {
+      switch (toolId) {
+        case 'analyze':
+          return '• Проведи глубокий анализ задачи перед выполнением';
+        case 'clarify':
+          return '• Задай 1-2 уточняющих вопроса для проверки логики задачи';
+        case 'todo':
+          return '• Составь To-Do план выполнения по шагам';
+        case 'review':
+          return '• Проведи критический анализ: найди ошибки, уязвимости и заблуждения';
+        default:
+          return '';
+      }
+    }).filter(Boolean).join('\n');
+
+    const toolsSection = toolInstructions ? `\n\n**ИНСТРУМЕНТЫ**:\n${toolInstructions}` : '';
+
+    return `Ты TruthPrompt — AI ассистент для анализа промптов и код-ревью.
+Твоя специализация — инновационные решения для разработчиков.
+
+**ПЛАН РАБОТЫ**:\n${planDescription}${toolsSection}
+
+**Запрос пользователя**:\n${prompt}
+
+Следуй плану шаг за шагом, используй выбранные инструменты и предоставляй подробный и качественный ответ.`;
+  }, []);
+
+  const generateMockResponse = useCallback((_prompt: string, selectedTools: string[] = []): string => {
+    // Формируем ответ на основе выбранных инструментов
+    const toolResponses = selectedTools.map(toolId => {
+      switch (toolId) {
+        case 'analyze':
+          return `**🔍 АНАЛИЗ ПРОМПТА**:\n\n**Качество промпта:** 85/100\n\n**Сильные стороны**:\n- Четко сформулирована задача\n- Указан ожидаемый результат\n\n**Рекомендации**:\n- Добавьте информацию об обработке ошибок\n- Укажите требования к производительности`;
+        case 'clarify':
+          return `**❓ УТОЧНЯЮЩИЕ ВОПРОСЫ**:\n\n1. Какую именно ошибку вы ожидаете получить при неудачном запросе?\n2. Нужна ли поддержка кэширования результатов или достаточно простого fetch?`;
+        case 'todo':
+          return `**📋 TO-DO ПЛАН**:\n\n1. ✓ Анализ запроса и требований\n2. ✓ Формирование структуры ответа\n3. ⏳ Генерация решения\n4. ⏳ Проверка и оптимизация`;
+        case 'review':
+          return `**⚠️ КРИТИЧЕСКИЙ АНАЛИЗ**:\n\n**Найденные проблемы**:\n1. Отсутствует обработка краевых случаев\n2. Нет типизации возвращаемого значения\n3. Возможна уязвимость при обработке больших данных\n\n**Рекомендации по улучшению**:\n- Добавьте валидацию входных данных\n- Используйте TypeScript для типизации`;
+        default:
+          return '';
+      }
+    }).join('\n\n');
+
+    const defaultResponse = `**ОТВЕТ AI**:\n\nОтличный запрос! Вот мое решение:\n\n\`\`\`typescript\nasync function loadData() {\n  try {\n    const response = await fetch('/api/data');\n    if (!response.ok) throw new Error('Failed to fetch');\n    return await response.json();\n  } catch (error) {\n    console.error('Error:', error);\n    return null;\n  }\n}\n\`\`\`\n\nХотите, чтобы я улучшил этот код?`;
+
+    return selectedTools.length > 0
+      ? `${toolResponses}\n\n${defaultResponse}`
+      : defaultResponse;
+  }, []);
+
+  // Функция парсинга ответа ИИ для извлечения результатов инструментов
+  const parseToolResults = useCallback((content: string, selectedTools: string[]) => {
+    const tools: Message['tools'] = {};
+
+    // Парсинг анализа промпта
+    if (selectedTools.includes('analyze')) {
+      const scoreMatch = content.match(/Качество промпта[:\s]+(\d+)/i) || content.match(/score[:\s]+(\d+)/i);
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : 75;
+      
+      const strengthsMatch = content.match(/\*\*Сильные стороны\*\*[:\s]*\n([\s\S]*?)(?=\n\*\*|$)/i);
+      const strengths = strengthsMatch 
+        ? strengthsMatch[1].split('\n').filter(l => l.trim().startsWith('-')).map(l => l.replace(/^-/, '').trim())
+        : [];
+
+      const weaknessesMatch = content.match(/\*\*Слабые стороны\*\*[:\s]*\n([\s\S]*?)(?=\n\*\*|$)/i);
+      const weaknesses = weaknessesMatch
+        ? weaknessesMatch[1].split('\n').filter(l => l.trim().startsWith('-')).map(l => l.replace(/^-/, '').trim())
+        : [];
+
+      tools.analysis = { score, strengths, weaknesses, summary: 'Анализ вашего промпта' };
+    }
+
+    // Парсинг уточняющих вопросов
+    if (selectedTools.includes('clarify')) {
+      const questionsMatch = content.match(/\*\*❓ УТОЧНЯЮЩИЕ ВОПРОСЫ\*\*[:\s]*\n([\s\S]*?)(?=\n\n|\*\*|$)/i);
+      if (questionsMatch) {
+        const questions = questionsMatch[1]
+          .split('\n')
+          .filter(l => l.match(/^\d+\./))
+          .map(l => l.replace(/^\d+\.\s*/, '').trim());
+        if (questions.length > 0) {
+          tools.questions = questions;
+        }
+      }
+    }
+
+    // Парсинг To-Do плана
+    if (selectedTools.includes('todo')) {
+      const todoMatch = content.match(/\*\*📋 TO-DO ПЛАН\*\*[:\s]*\n([\s\S]*?)(?=\n\n|\*\*|$)/i);
+      if (todoMatch) {
+        const steps = todoMatch[1]
+          .split('\n')
+          .filter(l => l.match(/^\d+\./))
+          .map((l, i) => {
+            const status: 'pending' | 'in_progress' | 'completed' = l.includes('✓') ? 'completed' : l.includes('⏳') ? 'in_progress' : 'pending';
+            return {
+              id: i + 1,
+              description: l.replace(/^\d+\.\s*[✓⏳]?\s*/, '').trim(),
+              status
+            };
+          });
+        if (steps.length > 0) {
+          tools.todoPlan = steps;
+        }
+      }
+    }
+
+    // Парсинг Code Review
+    if (selectedTools.includes('review')) {
+      const reviewMatch = content.match(/\*\*⚠️ КРИТИЧЕСКИЙ АНАЛИЗ\*\*[:\s]*\n([\s\S]*?)(?=\n\n|\*\*|$)/i);
+      if (reviewMatch) {
+        const issues: Array<{ severity: 'critical' | 'warning' | 'info'; title: string; description: string }> = [];
+        const lines = reviewMatch[1].split('\n').filter(l => l.trim());
+        
+        let currentIssue: Partial<typeof issues[0]> | null = null;
+        for (const line of lines) {
+          if (line.match(/^\d+\./)) {
+            if (currentIssue) {
+              issues.push(currentIssue as any);
+            }
+            currentIssue = {
+              severity: line.toLowerCase().includes('критическ') ? 'critical' : 'warning',
+              title: line.replace(/^\d+\.\s*/, '').trim(),
+              description: ''
+            };
+          } else if (currentIssue && line.trim()) {
+            currentIssue.description = (currentIssue.description + ' ' + line.trim()).trim();
+          }
+        }
+        if (currentIssue) {
+          issues.push(currentIssue as any);
+        }
+        if (issues.length > 0) {
+          tools.codeReview = issues;
+        }
+      }
+    }
+
+    // Оценка ИИ (всегда добавляется для ответов ассистента)
+    tools.assessment = {
+      aiScore: Math.floor(Math.random() * 15) + 80, // 80-95 для демо
+      usefulness: Math.floor(Math.random() * 20) + 75,
+      accuracy: Math.floor(Math.random() * 15) + 80,
+      completeness: Math.floor(Math.random() * 25) + 70
+    };
+
+    // Предложения по улучшению
+    tools.suggestions = [
+      {
+        id: 1,
+        title: 'Добавьте контекст',
+        description: 'Укажите больше деталей о вашем проекте и окружении'
+      },
+      {
+        id: 2,
+        title: 'Уточните требования',
+        description: 'Опишите ожидаемое поведение и граничные случаи'
+      }
+    ];
+
+    return tools;
+  }, []);
+
+  const processNextRequest = useCallback(async () => {
     // Проверяем, что можно обрабатывать
     if (queueProcessingRef.current || isTyping) {
       return;
     }
-    
+
     if (requestQueueRef.current.length === 0 || !currentChatIdForQueue) {
       return;
     }
@@ -220,7 +459,7 @@ export function ChatView() {
     if (pendingIndex === -1) return;
 
     const pendingRequest = requestQueueRef.current[pendingIndex];
-    
+
     // Сразу помечаем как processing чтобы предотвратить повторную обработку
     queueProcessingRef.current = true;
     requestQueueRef.current[pendingIndex].status = 'processing';
@@ -253,23 +492,27 @@ export function ChatView() {
       let aiResponse: string;
 
       // Формируем промпт с планом работы
-      const planPrompt = buildPlanPrompt(pendingRequest.prompt, plan);
+      const planPrompt = buildPlanPrompt(pendingRequest.prompt, plan, pendingRequest.selectedTools);
 
       if (apiKey) {
         // Отправляем запрос к реальному AI
         aiResponse = await sendToAI(planPrompt, pendingRequest.model.id, apiKey, controller.signal);
       } else {
         // Используем mock-ответ если нет API ключа
-        aiResponse = generateMockResponse(pendingRequest.prompt);
+        aiResponse = generateMockResponse(pendingRequest.prompt, pendingRequest.selectedTools);
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
+
+      // Парсим результаты инструментов
+      const toolResults = parseToolResults(aiResponse, pendingRequest.selectedTools);
 
       const assistantMessage: Message = {
         id: `msg-${Date.now()}-assistant`,
         role: 'assistant',
         content: aiResponse,
         timestamp: Date.now(),
-        model: pendingRequest.model.name
+        model: pendingRequest.model.name,
+        tools: toolResults
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -297,61 +540,28 @@ export function ChatView() {
       // Удаляем обработанный запрос из ref
       requestQueueRef.current = requestQueueRef.current.filter(req => req.id !== pendingRequest.id);
       setRequestQueue([...requestQueueRef.current]);
-      
+
       setIsTyping(false);
       setAbortController(null);
       setGenerationPlan(null);
       queueProcessingRef.current = false;
       setIsProcessingQueue(false);
     }
-  };
+  }, [currentChatIdForQueue, isTyping, generatePlanForRequest, buildPlanPrompt, generateMockResponse, parseToolResults]);
 
   // Запускаем обработку при появлении новых запросов
   useEffect(() => {
     // Проверяем наличие pending запросов
     const pendingCount = requestQueueRef.current.filter(r => r.status === 'pending').length;
-    
+
     // Запускаем обработку только если есть pending запросы и ничего не обрабатывается
-    if (pendingCount > 0 && 
-        !queueProcessingRef.current && 
-        !isTyping && 
+    if (pendingCount > 0 &&
+        !queueProcessingRef.current &&
+        !isTyping &&
         currentChatIdForQueue) {
       processNextRequest();
     }
   }, [requestQueue, currentChatIdForQueue, isTyping]);
-
-  const generatePlanForRequest = (request: QueuedRequest): GenerationPlan => {
-    // Генерируем план на основе запроса
-    const steps = [
-      { id: 1, description: 'Анализ запроса', status: 'pending' as const },
-      { id: 2, description: 'Формирование структуры ответа', status: 'pending' as const },
-      { id: 3, description: 'Генерация решения', status: 'pending' as const },
-      { id: 4, description: 'Проверка и оптимизация', status: 'pending' as const },
-    ];
-
-    return {
-      requestId: request.id,
-      steps,
-      currentStep: 0
-    };
-  };
-
-  const buildPlanPrompt = (prompt: string, plan: GenerationPlan): string => {
-    const planDescription = plan.steps.map((step, index) => 
-      `${index + 1}. ${step.description}`
-    ).join('\n');
-
-    return `Ты TruthPrompt — AI ассистент для анализа промптов и код-ревью.
-
-ВАЖНО: Работай строго по следующему плану:
-
-${planDescription}
-
-Запрос пользователя:
-${prompt}
-
-Следуй плану шаг за шагом, предоставляя подробный и качественный ответ.`;
-  };
 
   const handleStopGeneration = () => {
     if (abortController) {
@@ -368,18 +578,6 @@ ${prompt}
       requestQueueRef.current.splice(index, 1);
       setRequestQueue([...requestQueueRef.current]);
     }
-  };
-
-  const generateMockResponse = (_prompt: string): string => {
-    const responses = [
-      `Отличный запрос! Вот анализ вашего промпта:\n\n**Качество промпта:** 85/100\n\n**Сильные стороны:**\n- Четко сформулирована задача\n- Указан ожидаемый результат\n\n**Рекомендации:**\n- Добавьте информацию об обработке ошибок\n- Укажите требования к производительности\n\n**Пример кода:**\n\`\`\`typescript\nasync function loadData() {\n  try {\n    const response = await fetch('/api/data');\n    if (!response.ok) throw new Error('Failed to fetch');\n    return await response.json();\n  } catch (error) {\n    console.error('Error:', error);\n    return null;\n  }\n}\n\`\`\`\n\nХотите, чтобы я улучшил этот код?`,
-      
-      `Проанализировав ваш запрос, я предлагаю следующее решение:\n\n**Score:** 78/100\n\n**Проблемы:**\n1. Отсутствует обработка краевых случаев\n2. Нет типизации возвращаемого значения\n\n**Улучшенная версия:**\n\`\`\`typescript\ninterface UserData {\n  id: string;\n  name: string;\n  email: string;\n}\n\nconst fetchUsers = async (): Promise<UserData[]> => {\n  const res = await fetch('/api/users');\n  if (!res.ok) throw new Error('Network error');\n  return res.json();\n};\n\`\`\`\n\nЧто доработаем?`,
-      
-      `Интересная задача! Вот мой анализ:\n\n**Оценка:** 92/100 ⭐\n\n**Что хорошо:**\n✅ Ясная формулировка\n✅ Контекст задачи понятен\n\n**Код решения:**\n\`\`\`react\nfunction UserList({ users }: { users: User[] }) {\n  return (\n    <ul className="user-list">\n      {users.map(user => (\n        <li key={user.id}>\n          {user.name}\n        </li>\n      ))}\n    </ul>\n  );\n}\n\`\`\`\n\nНужны ли дополнительные объяснения?`
-    ];
-
-    return responses[Math.floor(Math.random() * responses.length)];
   };
 
   const copyMessage = async (content: string, id: string) => {
@@ -578,6 +776,46 @@ ${prompt}
                         {message.content}
                       </ReactMarkdown>
                     </div>
+
+                    {/* Отображение результатов инструментов для assistant сообщений */}
+                    {message.role === 'assistant' && message.tools && (
+                      <div className="message-tools" style={{ marginTop: 16 }}>
+                        {message.tools.analysis && (
+                          <PromptAnalysis
+                            score={message.tools.analysis.score}
+                            strengths={message.tools.analysis.strengths}
+                            weaknesses={message.tools.analysis.weaknesses}
+                            summary={message.tools.analysis.summary}
+                          />
+                        )}
+
+                        {message.tools.questions && message.tools.questions.length > 0 && (
+                          <ClarifyingQuestions questions={message.tools.questions} />
+                        )}
+
+                        {message.tools.todoPlan && message.tools.todoPlan.length > 0 && (
+                          <ToDoPlan steps={message.tools.todoPlan} />
+                        )}
+
+                        {message.tools.codeReview && message.tools.codeReview.length > 0 && (
+                          <CodeReview issues={message.tools.codeReview} />
+                        )}
+
+                        {message.tools.assessment && (
+                          <AIAssessment
+                            aiScore={message.tools.assessment.aiScore}
+                            usefulness={message.tools.assessment.usefulness}
+                            accuracy={message.tools.assessment.accuracy}
+                            completeness={message.tools.assessment.completeness}
+                          />
+                        )}
+
+                        {message.tools.suggestions && message.tools.suggestions.length > 0 && (
+                          <ImprovementSuggestions suggestions={message.tools.suggestions} />
+                        )}
+                      </div>
+                    )}
+
                     <div className="message-actions">
                       <button
                         className="message-action-btn"

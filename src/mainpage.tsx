@@ -90,7 +90,7 @@ const MainPage: React.FC = () => {
     setRandomSubtitle(randomSub);
   };
 
-  const handleAnalyze = async (prompt: string, model: CustomModel) => {
+  const handleAnalyze = async (prompt: string, model: CustomModel, selectedTools: string[]) => {
     if (!prompt.trim()) return;
 
     try {
@@ -99,8 +99,12 @@ const MainPage: React.FC = () => {
 
       // Сохраняем первое сообщение
       await addMessage(chatId, 'user', prompt, {
-        model_name: model.name
+        model_name: model.name,
+        metadata: { tools: selectedTools }
       });
+
+      // Сохраняем данные для отправки в ChatView
+      sessionStorage.setItem('initial_prompt', JSON.stringify({ prompt, model, selectedTools }));
 
       // Перенаправляем на чат
       navigate(`/chat/${chatId}`);
@@ -110,7 +114,7 @@ const MainPage: React.FC = () => {
       const fallbackChatId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const savedChats = localStorage.getItem('truthprompt_chats');
       const chats = savedChats ? JSON.parse(savedChats) : [];
-      
+
       chats.push({
         id: fallbackChatId,
         messages: [{
@@ -118,13 +122,18 @@ const MainPage: React.FC = () => {
           role: 'user',
           content: prompt,
           timestamp: Date.now(),
-          model: model.name
+          model: model.name,
+          metadata: { tools: selectedTools }
         }],
         createdAt: Date.now(),
         title: prompt.slice(0, 50) + (prompt.length > 50 ? '...' : '')
       });
-      
+
       localStorage.setItem('truthprompt_chats', JSON.stringify(chats));
+      
+      // Сохраняем данные для отправки в ChatView
+      sessionStorage.setItem('initial_prompt', JSON.stringify({ prompt, model, selectedTools }));
+      
       navigate(`/chat/${fallbackChatId}`);
     }
   };

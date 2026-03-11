@@ -1,0 +1,377 @@
+/* Tool Panels */
+.tool-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  backdrop-filter: blur(10px);
+}
+
+.tool-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tool-panel-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+  color: #818cf8;
+}
+
+.tool-panel-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #f3f4f6;
+}
+
+.tool-panel-content {
+  color: #d1d5db;
+  line-height: 1.6;
+}
+
+/* Prompt Analysis */
+.analysis-score {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.score-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: conic-gradient(#818cf8 var(--score-percent), rgba(255, 255, 255, 0.1) 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.score-circle::before {
+  content: '';
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #1f2937;
+}
+
+.score-value {
+  position: relative;
+  font-size: 24px;
+  font-weight: 700;
+  color: #818cf8;
+}
+
+.score-label {
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.strengths-list,
+.weaknesses-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+
+.strengths-list li,
+.weaknesses-list li {
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.strengths-list li {
+  background: rgba(34, 197, 94, 0.1);
+  border-left: 3px solid #22c55e;
+}
+
+.weaknesses-list li {
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid #ef4444;
+}
+
+/* Clarifying Questions */
+.questions-list {
+  list-style: none;
+  padding: 0;
+}
+
+.questions-list li {
+  padding: 16px;
+  margin: 12px 0;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+}
+
+.question-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.question-text {
+  flex: 1;
+  color: #e5e7eb;
+}
+
+/* To-Do Plan */
+.todo-steps {
+  list-style: none;
+  padding: 0;
+}
+
+.todo-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  margin: 8px 0;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.todo-step:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.todo-step.completed {
+  opacity: 0.6;
+}
+
+.todo-step.completed .todo-check {
+  background: #22c55e;
+  border-color: #22c55e;
+}
+
+.todo-step.completed .todo-step-text {
+  text-decoration: line-through;
+}
+
+.todo-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid #6366f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+  font-size: 14px;
+}
+
+.todo-step-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.todo-step-text {
+  flex: 1;
+  color: #e5e7eb;
+}
+
+/* Code Review */
+.review-critical,
+.review-warning,
+.review-info {
+  padding: 14px;
+  margin: 10px 0;
+  border-radius: 10px;
+  border-left: 4px solid;
+}
+
+.review-critical {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+}
+
+.review-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: #f59e0b;
+}
+
+.review-info {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+}
+
+.review-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-critical .review-title {
+  color: #fca5a5;
+}
+
+.review-warning .review-title {
+  color: #fcd34d;
+}
+
+.review-info .review-title {
+  color: #93c5fd;
+}
+
+.review-description {
+  color: #9ca3af;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* AI Self-Assessment */
+.ai-assessment {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05));
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.assessment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.assessment-item {
+  text-align: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+}
+
+.assessment-value {
+  font-size: 28px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.assessment-label {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+/* Improvement Suggestions */
+.suggestions-list {
+  list-style: none;
+  padding: 0;
+}
+
+.suggestions-list li {
+  padding: 14px;
+  margin: 10px 0;
+  background: rgba(34, 197, 94, 0.05);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+}
+
+.suggestion-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.suggestion-text {
+  flex: 1;
+  color: #d1d5db;
+}
+
+/* User Rating */
+.user-rating {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rating-title {
+  font-size: 14px;
+  color: #9ca3af;
+  margin-bottom: 12px;
+}
+
+.rating-stars {
+  display: flex;
+  gap: 8px;
+}
+
+.rating-star {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rating-star:hover {
+  border-color: #fbbf24;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.rating-star.active {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #fff;
+}
+
+.rating-feedback {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 8px;
+  color: #22c55e;
+  font-size: 14px;
+}
