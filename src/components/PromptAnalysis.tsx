@@ -8,7 +8,21 @@ interface PromptAnalysisProps {
   summary: string;
 }
 
+function getScoreColor(score: number): string {
+  if (score >= 80) return '#22c55e';
+  if (score >= 60) return '#eab308';
+  return '#ef4444';
+}
+
+function getScoreStatus(score: number): string {
+  if (score >= 80) return 'Отлично';
+  if (score >= 60) return 'Хорошо';
+  return 'Требует улучшений';
+}
+
 export function PromptAnalysis({ score, strengths, weaknesses, summary }: PromptAnalysisProps) {
+  const scoreColor = getScoreColor(score);
+
   return (
     <div className="tool-panel">
       <div className="tool-panel-header">
@@ -20,23 +34,29 @@ export function PromptAnalysis({ score, strengths, weaknesses, summary }: Prompt
 
       <div className="tool-panel-content">
         <div className="analysis-score">
-          <div className="score-circle" style={{ '--score-percent': `${score}%` } as React.CSSProperties}>
-            <span className="score-value">{score}</span>
+          <div 
+            className="score-circle" 
+            style={{ 
+              '--score-percent': `${score}%`,
+              '--score-color': scoreColor
+            } as React.CSSProperties}
+          >
+            <span className="score-value" style={{ color: scoreColor }}>{score}</span>
           </div>
           <div>
             <div className="score-label">Качество промпта</div>
-            <div style={{ color: score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444' }}>
-              {score >= 80 ? 'Отлично' : score >= 60 ? 'Хорошо' : 'Требует улучшений'}
+            <div className="score-status" style={{ color: scoreColor }}>
+              {getScoreStatus(score)}
             </div>
           </div>
         </div>
 
-        <p style={{ marginBottom: 16, color: '#d1d5db' }}>{summary}</p>
+        <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>{summary}</p>
 
         {strengths.length > 0 && (
           <>
-            <h4 style={{ color: '#22c55e', fontSize: 14, marginBottom: 8 }}>
-              <CheckCircle2 size={16} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+            <h4 style={{ color: 'var(--score-high)', fontSize: 13, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CheckCircle2 size={16} />
               Сильные стороны
             </h4>
             <ul className="strengths-list">
@@ -49,8 +69,8 @@ export function PromptAnalysis({ score, strengths, weaknesses, summary }: Prompt
 
         {weaknesses.length > 0 && (
           <>
-            <h4 style={{ color: '#ef4444', fontSize: 14, marginBottom: 8 }}>
-              <XCircle size={16} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+            <h4 style={{ color: 'var(--score-low)', fontSize: 13, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <XCircle size={16} />
               Слабые стороны
             </h4>
             <ul className="weaknesses-list">

@@ -283,15 +283,35 @@ export function ChatView() {
   ): string => {
     // Определяем фазу диалога
     const userMessageCount = conversationHistory.filter(m => m.role === 'user').length;
-    const isFollowUp = userMessageCount > 1; // Если больше 1 сообщения от пользователя — это ответ на уточняющие вопросы
+    const isFollowUp = userMessageCount > 1;
+
+    // Оцениваем качество промпта для определения стратегии
+    const promptLength = prompt.length;
+    let estimatedScore = 50;
+    if (promptLength >= 100) estimatedScore = 85;
+    else if (promptLength >= 50) estimatedScore = 65;
+    else if (promptLength >= 30) estimatedScore = 50;
+    else estimatedScore = 30;
+
+    // Определяем стратегию ответа
+    let strategy = '';
+    if (isFollowUp) {
+      strategy = '**ФАЗА: ВЫПОЛНЕНИЕ**\nПользователь ответил на вопросы. ТЕПЕРЬ ВЫПОЛНИ ЗАДАЧУ — напиши код/решение.';
+    } else if (estimatedScore >= 85) {
+      strategy = '**ФАЗА: АНАЛИЗ + КОД**\nПромпт отличный → сразу дай код/решение + краткий анализ после.';
+    } else if (estimatedScore >= 60) {
+      strategy = '**ФАЗА: КРАТКИЙ АНАЛИЗ + КОД**\nПромпт хороший → краткий анализ + сразу код/решение.';
+    } else {
+      strategy = '**ФАЗА: УТОЧНЕНИЕ**\nПромпт слабый → СНАЧАЛА задай 1-2 уточняющих вопроса, не пиши код пока пользователь не ответит.';
+    }
 
     // Формируем инструкции для выбранных инструментов
     const toolInstructions = selectedTools.map(toolId => {
       switch (toolId) {
         case 'analyze':
-          return '• Проведи глубокий анализ задачи: оцени качество промпта (0-100), выдели сильные и слабые стороны';
+          return '• Оцени качество промпта (0-100), выдели сильные и слабые стороны';
         case 'clarify':
-          return '• Задай 1-2 уточняющих вопроса для проверки логики задачи (как специалист клиенту)';
+          return '• Задай 1-2 уточняющих вопроса (только если промпт слабый!)';
         case 'todo':
           return '• To-Do план формируется автоматически — НЕ пиши его текстом в ответе';
         case 'review':
@@ -301,14 +321,12 @@ export function ChatView() {
       }
     }).filter(Boolean).join('\n');
 
-    const phaseInstruction = isFollowUp
-      ? '\n\n**ФАЗА: ВЫПОЛНЕНИЕ**\nПользователь ответил на твои вопросы. Теперь ВЫПОЛНИ задачу — напиши код/решение.'
-      : '\n\n**ФАЗА: АНАЛИЗ**\nСначала оцени промпт и задай 1-2 уточняющих вопроса.';
-
     return `Ты TruthPrompt — AI ассистент для анализа промптов и код-ревью.
 Твоя специализация — инновационные решения для разработчиков.
 
-**ИНСТРУМЕНТЫ**:\n${toolInstructions}${phaseInstruction}
+**СТРАТЕГИЯ ОТВЕТА**:\n${strategy}
+
+**ИНСТРУМЕНТЫ**:\n${toolInstructions}
 
 **ВАЖНО**: 
 - To-Do план отображается в UI автоматически — НЕ пиши его текстом
@@ -323,30 +341,56 @@ export function ChatView() {
   }, []);
 
   const generateMockResponse = useCallback((prompt: string, selectedTools: string[] = []): string => {
-    // Оцениваем качество промпта по его содержимому
+    // Оцениваем качество промпта
     const promptScore = evaluatePromptQuality(prompt);
     
-    // Формируем ответ на основе выбранных инструментов
-    const toolResponses = selectedTools.map(toolId => {
-      switch (toolId) {
-        case 'analyze':
-          return `**🔍 АНАЛИЗ ПРОМПТА**\n\n**Оценка:** ${promptScore}/100\n\n${getPromptFeedback(promptScore)}`;
-        case 'clarify':
-          return `**❓ УТОЧНЯЮЩИЕ ВОПРОСЫ**:\n\n${getClarifyingQuestions(prompt)}`;
-        case 'todo':
-          return ''; // To-Do план отображается в UI, не пишем текстом
-        case 'review':
-          return `**⚠️ КРИТИЧЕСКИЙ АНАЛИЗ**:\n\n${getCodeReviewMock(prompt)}`;
-        default:
-          return '';
-      }
-    }).filter(Boolean).join('\n\n');
+    // Определяем стратегию
+    const isFollowUp = prompt.toLowerCase().includes('да') || prompt.toLowerCase().includes('нет') || prompt.length < 20;
+    
+    let toolResponses = '';
+    
+    if (isFollowUp) {
+      // Пользователь ответил — выполняем задачу
+      toolResponses = selectedTools.map(toolId => {
+        switch (toolId) {
+          case 'analyze':
+            return `**🔍 АНАЛИЗ ПРОМПТА**\n\n**Оценка:** ${promptScore}/100\n\n${getPromptFeedback(promptScore)}`;
+          case 'review':
+            return `**⚠️ КРИТИЧЕСКИЙ АНАЛИЗ**:\n\n[ПРЕДУПРЕЖДЕНИЕ] Отсутствует обработка ошибок\n[ПРЕДУПРЕЖДЕНИЕ] Нет типизации данных`;
+          default:
+            return '';
+        }
+      }).filter(Boolean).join('\n\n');
+      
+      // Добавляем код
+      toolResponses += `\n\n**✅ РЕШЕНИЕ**:\n\n${getAIResponse(prompt)}`;
+    } else if (promptScore >= 85) {
+      // Отличный промпт — сразу код + анализ
+      toolResponses = `**✅ ГОТОВОЕ РЕШЕНИЕ**:\n\n${getAIResponse(prompt)}\n\n**🔍 АНАЛИЗ**:\n\n${getPromptFeedback(promptScore)}`;
+    } else if (promptScore >= 60) {
+      // Хороший промпт — краткий анализ + код
+      toolResponses = `**🔍 КРАТКИЙ АНАЛИЗ**:\n\n${getPromptFeedback(promptScore).split('\n\n')[0]}\n\n**✅ РЕШЕНИЕ**:\n\n${getAIResponse(prompt)}`;
+    } else {
+      // Слабый промпт — только вопросы
+      toolResponses = selectedTools.map(toolId => {
+        switch (toolId) {
+          case 'analyze':
+            return `**🔍 АНАЛИЗ ПРОМПТА**\n\n**Оценка:** ${promptScore}/100\n\n${getPromptFeedback(promptScore)}`;
+          case 'clarify':
+            return `**❓ УТОЧНЯЮЩИЕ ВОПРОСЫ**:\n\n${getClarifyingQuestions(prompt)}`;
+          case 'review':
+            return `**⚠️ ПРЕДВАРИТЕЛЬНЫЙ АНАЛИЗ**:\n\n[ПРЕДУПРЕЖДЕНИЕ] Недостаточно информации для анализа кода`;
+          default:
+            return '';
+        }
+      }).filter(Boolean).join('\n\n');
+    }
 
-    const defaultResponse = `**ОТВЕТ AI**:\n\n${getAIResponse(prompt)}\n\nХотите, чтобы я улучшил этот код?`;
+    const defaultResponse = toolResponses || `**ОТВЕТ AI**:\n\n${getAIResponse(prompt)}\n\nХотите, чтобы я улучшил этот код?`;
 
     return selectedTools.length > 0
-      ? `${toolResponses}\n\n${defaultResponse}`
-      : defaultResponse;
+      ? defaultResponse
+      : `**ОТВЕТ AI**:\n\n${getAIResponse(prompt)}\n\nХотите, чтобы я улучшил этот код?`;
   }, []);
 
   // Оценка качества промпта (0-100)

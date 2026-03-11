@@ -10,6 +10,18 @@ interface AIAssessmentProps {
   onUserRate?: (rating: number) => void;
 }
 
+function getBadgeType(score: number): string {
+  if (score >= 80) return 'high';
+  if (score >= 60) return 'medium';
+  return 'low';
+}
+
+function getScoreColor(score: number): string {
+  if (score >= 80) return '#22c55e';
+  if (score >= 60) return '#eab308';
+  return '#ef4444';
+}
+
 export function AIAssessment({ 
   aiScore = 85, 
   usefulness = 80, 
@@ -26,6 +38,9 @@ export function AIAssessment({
     onUserRate?.(rating);
   };
 
+  const badgeType = getBadgeType(aiScore);
+  const scoreColor = getScoreColor(aiScore);
+
   return (
     <div className="tool-panel ai-assessment">
       <div className="tool-panel-header">
@@ -36,21 +51,41 @@ export function AIAssessment({
       </div>
 
       <div className="tool-panel-content">
+        {/* Главный бейдж с оценкой */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+          <div 
+            className="request-badge" 
+            style={{ 
+              background: `linear-gradient(135deg, ${scoreColor}25, ${scoreColor}15)`,
+              border: `1px solid ${scoreColor}40`,
+              color: scoreColor,
+              padding: '8px 16px',
+              fontSize: '24px',
+              fontWeight: 700,
+              borderRadius: '100px'
+            }}
+          >
+            {aiScore}/100
+          </div>
+          <div>
+            <div style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: 4 }}>Качество ответа</div>
+            <div style={{ fontSize: '13px', color: scoreColor, fontWeight: 500 }}>
+              {badgeType === 'high' ? 'Отлично' : badgeType === 'medium' ? 'Хорошо' : 'Требует улучшений'}
+            </div>
+          </div>
+        </div>
+
         <div className="assessment-grid">
           <div className="assessment-item">
-            <div className="assessment-value">{aiScore}%</div>
-            <div className="assessment-label">Общее качество</div>
-          </div>
-          <div className="assessment-item">
-            <div className="assessment-value">{usefulness}%</div>
+            <div className="assessment-value" style={{ color: getScoreColor(usefulness) }}>{usefulness}%</div>
             <div className="assessment-label">Полезность</div>
           </div>
           <div className="assessment-item">
-            <div className="assessment-value">{accuracy}%</div>
+            <div className="assessment-value" style={{ color: getScoreColor(accuracy) }}>{accuracy}%</div>
             <div className="assessment-label">Точность</div>
           </div>
           <div className="assessment-item">
-            <div className="assessment-value">{completeness}%</div>
+            <div className="assessment-value" style={{ color: getScoreColor(completeness) }}>{completeness}%</div>
             <div className="assessment-label">Полнота</div>
           </div>
         </div>
