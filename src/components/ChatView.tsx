@@ -274,61 +274,134 @@ export function ChatView() {
     };
   }, []);
 
-  const buildPlanPrompt = useCallback((prompt: string, plan: GenerationPlan, selectedTools: string[] = []): string => {
-    const planDescription = plan.steps.map((step, index) =>
-      `${index + 1}. ${step.description}`
-    ).join('\n');
-
+  const buildPlanPrompt = useCallback((prompt: string, _plan: GenerationPlan, selectedTools: string[] = []): string => {
     // Формируем инструкции для выбранных инструментов
     const toolInstructions = selectedTools.map(toolId => {
       switch (toolId) {
         case 'analyze':
-          return '• Проведи глубокий анализ задачи перед выполнением';
+          return '• Проведи глубокий анализ задачи: оцени качество промпта (0-100), выдели сильные и слабые стороны';
         case 'clarify':
-          return '• Задай 1-2 уточняющих вопроса для проверки логики задачи';
+          return '• Задай 1-2 уточняющих вопроса для проверки логики задачи (как специалист клиенту)';
         case 'todo':
-          return '• Составь To-Do план выполнения по шагам';
+          return '• To-Do план формируется автоматически — НЕ пиши его текстом в ответе';
         case 'review':
-          return '• Проведи критический анализ: найди ошибки, уязвимости и заблуждения';
+          return '• Проведи критический анализ: найди ошибки, уязвимости и заблуждения в коде';
         default:
           return '';
       }
     }).filter(Boolean).join('\n');
 
-    const toolsSection = toolInstructions ? `\n\n**ИНСТРУМЕНТЫ**:\n${toolInstructions}` : '';
-
     return `Ты TruthPrompt — AI ассистент для анализа промптов и код-ревью.
 Твоя специализация — инновационные решения для разработчиков.
 
-**ПЛАН РАБОТЫ**:\n${planDescription}${toolsSection}
+**ИНСТРУМЕНТЫ**:\n${toolInstructions}
+
+**ВАЖНО**: 
+- To-Do план отображается в UI автоматически — НЕ пиши его текстом
+- Оценку промпта пиши в формате: "Оценка: X/100"
+- Уточняющие вопросы нумеруй: "1.", "2."
+- Код ревью помечай: [КРИТИЧНО], [ПРЕДУПРЕЖДЕНИЕ]
 
 **Запрос пользователя**:\n${prompt}
 
-Следуй плану шаг за шагом, используй выбранные инструменты и предоставляй подробный и качественный ответ.`;
+Следуй инструкциям и предоставляй подробный ответ.`;
   }, []);
 
-  const generateMockResponse = useCallback((_prompt: string, selectedTools: string[] = []): string => {
+  const generateMockResponse = useCallback((prompt: string, selectedTools: string[] = []): string => {
+    // Оцениваем качество промпта по его содержимому
+    const promptScore = evaluatePromptQuality(prompt);
+    
     // Формируем ответ на основе выбранных инструментов
     const toolResponses = selectedTools.map(toolId => {
       switch (toolId) {
         case 'analyze':
-          return `**🔍 АНАЛИЗ ПРОМПТА**:\n\n**Качество промпта:** 85/100\n\n**Сильные стороны**:\n- Четко сформулирована задача\n- Указан ожидаемый результат\n\n**Рекомендации**:\n- Добавьте информацию об обработке ошибок\n- Укажите требования к производительности`;
+          return `**🔍 АНАЛИЗ ПРОМПТА**\n\n**Оценка:** ${promptScore}/100\n\n${getPromptFeedback(promptScore)}`;
         case 'clarify':
-          return `**❓ УТОЧНЯЮЩИЕ ВОПРОСЫ**:\n\n1. Какую именно ошибку вы ожидаете получить при неудачном запросе?\n2. Нужна ли поддержка кэширования результатов или достаточно простого fetch?`;
+          return `**❓ УТОЧНЯЮЩИЕ ВОПРОСЫ**:\n\n${getClarifyingQuestions(prompt)}`;
         case 'todo':
-          return `**📋 TO-DO ПЛАН**:\n\n1. ✓ Анализ запроса и требований\n2. ✓ Формирование структуры ответа\n3. ⏳ Генерация решения\n4. ⏳ Проверка и оптимизация`;
+          return ''; // To-Do план отображается в UI, не пишем текстом
         case 'review':
-          return `**⚠️ КРИТИЧЕСКИЙ АНАЛИЗ**:\n\n**Найденные проблемы**:\n1. Отсутствует обработка краевых случаев\n2. Нет типизации возвращаемого значения\n3. Возможна уязвимость при обработке больших данных\n\n**Рекомендации по улучшению**:\n- Добавьте валидацию входных данных\n- Используйте TypeScript для типизации`;
+          return `**⚠️ КРИТИЧЕСКИЙ АНАЛИЗ**:\n\n${getCodeReviewMock(prompt)}`;
         default:
           return '';
       }
-    }).join('\n\n');
+    }).filter(Boolean).join('\n\n');
 
-    const defaultResponse = `**ОТВЕТ AI**:\n\nОтличный запрос! Вот мое решение:\n\n\`\`\`typescript\nasync function loadData() {\n  try {\n    const response = await fetch('/api/data');\n    if (!response.ok) throw new Error('Failed to fetch');\n    return await response.json();\n  } catch (error) {\n    console.error('Error:', error);\n    return null;\n  }\n}\n\`\`\`\n\nХотите, чтобы я улучшил этот код?`;
+    const defaultResponse = `**ОТВЕТ AI**:\n\n${getAIResponse(prompt)}\n\nХотите, чтобы я улучшил этот код?`;
 
     return selectedTools.length > 0
       ? `${toolResponses}\n\n${defaultResponse}`
       : defaultResponse;
+  }, []);
+
+  // Оценка качества промпта (0-100)
+  const evaluatePromptQuality = useCallback((prompt: string): number => {
+    const p = prompt.toLowerCase().trim();
+    
+    // Очень короткие промпты (< 15 символов)
+    if (p.length < 15) return Math.floor(Math.random() * 20) + 15; // 15-35
+    
+    // Простые запросы без контекста
+    if (p.length < 30) return Math.floor(Math.random() * 25) + 30; // 30-55
+    
+    // Промпты средней длины
+    if (p.length < 50) return Math.floor(Math.random() * 20) + 50; // 50-70
+    
+    // Детальные промпты
+    if (p.length >= 50) {
+      let score = 65;
+      
+      // Бонус за наличие ключевых слов
+      if (p.includes('функци') || p.includes('компонент') || p.includes('класс')) score += 10;
+      if (p.includes('typescript') || p.includes('interface') || p.includes('type')) score += 8;
+      if (p.includes('ошибка') || p.includes('обработ') || p.includes('try') || p.includes('catch')) score += 7;
+      if (p.includes('данные') || p.includes('api') || p.includes('fetch') || p.includes('request')) score += 5;
+      if (p.includes('пользователь') || p.includes('user') || p.includes('auth')) score += 5;
+      
+      return Math.min(score + Math.floor(Math.random() * 10), 95);
+    }
+    
+    return 50;
+  }, []);
+
+  // Получение отзыва на основе оценки
+  const getPromptFeedback = useCallback((score: number): string => {
+    if (score < 30) {
+      return `**Сильные стороны**:\n- Запрос понятен в общих чертах\n\n**Слабые стороны**:\n- Критически не хватает контекста\n- Не указаны требования и ожидания\n- Нет информации о технологиях\n- Отсутствуют примеры желаемого результата`;
+    } else if (score < 50) {
+      return `**Сильные стороны**:\n- Основная задача ясна\n\n**Слабые стороны**:\n- Не хватает деталей о проекте\n- Не указаны граничные случаи\n- Нет информации об ошибках`;
+    } else if (score < 70) {
+      return `**Сильные стороны**:\n- Задача сформулирована четко\n- Есть базовый контекст\n\n**Слабые стороны**:\n- Можно добавить больше деталей\n- Не указаны требования к производительности`;
+    } else {
+      return `**Сильные стороны**:\n- Отличная детализация\n- Понятный контекст\n- Ясные требования\n\n**Слабые стороны**:\n- Можно добавить примеры данных`;
+    }
+  }, []);
+
+  // Генерация уточняющих вопросов на основе промпта
+  const getClarifyingQuestions = useCallback((prompt: string): string => {
+    const p = prompt.toLowerCase();
+    
+    if (p.includes('сайт') || p.includes('веб')) {
+      return '1. Какой стек технологий вы используете (React, Vue, Angular, vanilla)?\n2. Нужна ли адаптивная верстка и поддержка мобильных устройств?';
+    } else if (p.includes('функци') || p.includes('метод')) {
+      return '1. Какие входные данные ожидает функция и что должна возвращать?\n2. Как должна обрабатываться ошибка в случае неудачи?';
+    } else if (p.includes('api') || p.includes('fetch')) {
+      return '1. Какой формат данных вы ожидаете от API (JSON, XML, текст)?\n2. Нужна ли обработка повторных попыток при ошибке сети?';
+    } else if (p.includes('компонент') || p.includes('react') || p.includes('vue')) {
+      return '1. Какие props должен принимать компонент?\n2. Нужно ли управлять состоянием внутри компонента или использовать внешнее?';
+    } else {
+      return '1. Какой контекст проекта (фреймворк, версия, окружение)?\n2. Какие конкретные требования к результату?';
+    }
+  }, []);
+
+  // Mock Code Review
+  const getCodeReviewMock = useCallback((_prompt: string): string => {
+    return '[ПРЕДУПРЕЖДЕНИЕ] Отсутствует обработка ошибок\n[ПРЕДУПРЕЖДЕНИЕ] Нет типизации данных';
+  }, []);
+
+  // Mock AI ответ
+  const getAIResponse = useCallback((_prompt: string): string => {
+    return `Вот решение для вашей задачи:\n\n\`\`\`typescript\nasync function loadData() {\n  try {\n    const response = await fetch('/api/data');\n    if (!response.ok) throw new Error('Failed to fetch');\n    return await response.json();\n  } catch (error) {\n    console.error('Error:', error);\n    return null;\n  }\n}\n\`\`\``;
   }, []);
 
   // Функция парсинга ответа ИИ для извлечения результатов инструментов
@@ -337,7 +410,10 @@ export function ChatView() {
 
     // Парсинг анализа промпта
     if (selectedTools.includes('analyze')) {
-      const scoreMatch = content.match(/Качество промпта[:\s]+(\d+)/i) || content.match(/score[:\s]+(\d+)/i);
+      // Ищем оценку в форматах: "Оценка: 75/100", "Качество промпта: 85/100", "75/100"
+      const scoreMatch = content.match(/Оценка[:\s]*(\d+)\s*\/\s*100/i) 
+        || content.match(/Качество промпта[:\s]*(\d+)\s*\/\s*100/i)
+        || content.match(/(\d+)\s*\/\s*100/i);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : 75;
       
       const strengthsMatch = content.match(/\*\*Сильные стороны\*\*[:\s]*\n([\s\S]*?)(?=\n\*\*|$)/i);
@@ -367,61 +443,33 @@ export function ChatView() {
       }
     }
 
-    // Парсинг To-Do плана
-    if (selectedTools.includes('todo')) {
-      const todoMatch = content.match(/\*\*📋 TO-DO ПЛАН\*\*[:\s]*\n([\s\S]*?)(?=\n\n|\*\*|$)/i);
-      if (todoMatch) {
-        const steps = todoMatch[1]
-          .split('\n')
-          .filter(l => l.match(/^\d+\./))
-          .map((l, i) => {
-            const status: 'pending' | 'in_progress' | 'completed' = l.includes('✓') ? 'completed' : l.includes('⏳') ? 'in_progress' : 'pending';
-            return {
-              id: i + 1,
-              description: l.replace(/^\d+\.\s*[✓⏳]?\s*/, '').trim(),
-              status
-            };
-          });
-        if (steps.length > 0) {
-          tools.todoPlan = steps;
-        }
-      }
-    }
+    // To-Do план НЕ парсим — он генерируется автоматически из GenerationPlan
+    // if (selectedTools.includes('todo')) { ... }
 
     // Парсинг Code Review
     if (selectedTools.includes('review')) {
-      const reviewMatch = content.match(/\*\*⚠️ КРИТИЧЕСКИЙ АНАЛИЗ\*\*[:\s]*\n([\s\S]*?)(?=\n\n|\*\*|$)/i);
-      if (reviewMatch) {
-        const issues: Array<{ severity: 'critical' | 'warning' | 'info'; title: string; description: string }> = [];
-        const lines = reviewMatch[1].split('\n').filter(l => l.trim());
-        
-        let currentIssue: Partial<typeof issues[0]> | null = null;
-        for (const line of lines) {
-          if (line.match(/^\d+\./)) {
-            if (currentIssue) {
-              issues.push(currentIssue as any);
-            }
-            currentIssue = {
-              severity: line.toLowerCase().includes('критическ') ? 'critical' : 'warning',
-              title: line.replace(/^\d+\.\s*/, '').trim(),
-              description: ''
-            };
-          } else if (currentIssue && line.trim()) {
-            currentIssue.description = (currentIssue.description + ' ' + line.trim()).trim();
-          }
-        }
-        if (currentIssue) {
-          issues.push(currentIssue as any);
-        }
-        if (issues.length > 0) {
-          tools.codeReview = issues;
-        }
+      const issues: Array<{ severity: 'critical' | 'warning' | 'info'; title: string; description: string }> = [];
+      
+      // Ищем [КРИТИЧНО] и [ПРЕДУПРЕЖДЕНИЕ]
+      const criticalMatches = content.matchAll(/\[КРИТИЧНО\]\s*(.+?)(?:\n|$)/gi);
+      for (const match of criticalMatches) {
+        issues.push({ severity: 'critical', title: match[1].trim(), description: '' });
+      }
+      
+      const warningMatches = content.matchAll(/\[ПРЕДУПРЕЖДЕНИЕ\]\s*(.+?)(?:\n|$)/gi);
+      for (const match of warningMatches) {
+        issues.push({ severity: 'warning', title: match[1].trim(), description: '' });
+      }
+
+      if (issues.length > 0) {
+        tools.codeReview = issues;
       }
     }
 
-    // Оценка ИИ (всегда добавляется для ответов ассистента)
+    // Оценка ИИ — НЕЗАВИСИМАЯ от оценки промпта
+    // Это оценка КАЧЕСТВА ОТВЕТА ИИ, а не промпта пользователя
     tools.assessment = {
-      aiScore: Math.floor(Math.random() * 15) + 80, // 80-95 для демо
+      aiScore: Math.floor(Math.random() * 15) + 80, // 80-95 — ИИ старается хорошо отвечать
       usefulness: Math.floor(Math.random() * 20) + 75,
       accuracy: Math.floor(Math.random() * 15) + 80,
       completeness: Math.floor(Math.random() * 25) + 70
@@ -506,6 +554,15 @@ export function ChatView() {
       // Парсим результаты инструментов
       const toolResults = parseToolResults(aiResponse, pendingRequest.selectedTools);
 
+      // Добавляем To-Do план из generationPlan
+      if (generationPlan && generationPlan.steps.length > 0) {
+        toolResults.todoPlan = generationPlan.steps.map(step => ({
+          id: step.id,
+          description: step.description,
+          status: step.status
+        }));
+      }
+
       const assistantMessage: Message = {
         id: `msg-${Date.now()}-assistant`,
         role: 'assistant',
@@ -547,7 +604,7 @@ export function ChatView() {
       queueProcessingRef.current = false;
       setIsProcessingQueue(false);
     }
-  }, [currentChatIdForQueue, isTyping, generatePlanForRequest, buildPlanPrompt, generateMockResponse, parseToolResults]);
+  }, [currentChatIdForQueue, isTyping, generatePlanForRequest, buildPlanPrompt, generateMockResponse, parseToolResults, evaluatePromptQuality, getPromptFeedback, getClarifyingQuestions, getCodeReviewMock, getAIResponse]);
 
   // Запускаем обработку при появлении новых запросов
   useEffect(() => {
