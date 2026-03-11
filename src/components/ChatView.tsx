@@ -12,7 +12,7 @@ import {
   getChatWithMessages,
   addMessage,
   createChat,
-  sendToAI
+  sendToAIWithHistory
 } from '../lib/chats';
 import { PromptAnalysis } from './PromptAnalysis';
 import { ClarifyingQuestions } from './ClarifyingQuestions';
@@ -274,7 +274,16 @@ export function ChatView() {
     };
   }, []);
 
-  const buildPlanPrompt = useCallback((prompt: string, _plan: GenerationPlan, selectedTools: string[] = []): string => {
+  const buildPlanPrompt = useCallback((
+    prompt: string,
+    _plan: GenerationPlan,
+    selectedTools: string[] = [],
+    conversationHistory: Array<{ role: string; content: string }> = []
+  ): string => {
+    // Определяем фазу диалога
+    const userMessageCount = conversationHistory.filter(m => m.role === 'user').length;
+    const isFollowUp = userMessageCount > 1; // Если больше 1 сообщения от пользователя — это ответ на уточняющие вопросы
+
     // Формируем инструкции для выбранных инструментов
     const toolInstructions = selectedTools.map(toolId => {
       switch (toolId) {
@@ -291,16 +300,21 @@ export function ChatView() {
       }
     }).filter(Boolean).join('\n');
 
+    const phaseInstruction = isFollowUp
+      ? '\n\n**ФАЗА: ВЫПОЛНЕНИЕ**\nПользователь ответил на твои вопросы. Теперь ВЫПОЛНИ задачу — напиши код/решение.'
+      : '\n\n**ФАЗА: АНАЛИЗ**\nСначала оцени промпт и задай 1-2 уточняющих вопроса.';
+
     return `Ты TruthPrompt — AI ассистент для анализа промптов и код-ревью.
 Твоя специализация — инновационные решения для разработчиков.
 
-**ИНСТРУМЕНТЫ**:\n${toolInstructions}
+**ИНСТРУМЕНТЫ**:\n${toolInstructions}${phaseInstruction}
 
 **ВАЖНО**: 
 - To-Do план отображается в UI автоматически — НЕ пиши его текстом
 - Оценку промпта пиши в формате: "Оценка: X/100"
 - Уточняющие вопросы нумеруй: "1.", "2."
 - Код ревью помечай: [КРИТИЧНО], [ПРЕДУПРЕЖДЕНИЕ]
+- Если пользователь уже ответил на вопросы — НЕ спрашивай снова, сразу выполняй задачу!
 
 **Запрос пользователя**:\n${prompt}
 
@@ -539,12 +553,20 @@ export function ChatView() {
 
       let aiResponse: string;
 
-      // Формируем промпт с планом работы
-      const planPrompt = buildPlanPrompt(pendingRequest.prompt, plan, pendingRequest.selectedTools);
+      // Формируем историю диалога для контекста
+      const conversationHistory = messages
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .map(m => ({
+          role: m.role,
+          content: m.content
+        }));
+
+      // Формируем промпт с планом работы и историей
+      const planPrompt = buildPlanPrompt(pendingRequest.prompt, plan, pendingRequest.selectedTools, conversationHistory);
 
       if (apiKey) {
-        // Отправляем запрос к реальному AI
-        aiResponse = await sendToAI(planPrompt, pendingRequest.model.id, apiKey, controller.signal);
+        // Отправляем запрос к реальному AI с историей диалога
+        aiResponse = await sendToAIWithHistory(planPrompt, pendingRequest.model.id, apiKey, controller.signal, conversationHistory);
       } else {
         // Используем mock-ответ если нет API ключа
         aiResponse = generateMockResponse(pendingRequest.prompt, pendingRequest.selectedTools);
@@ -604,7 +626,7 @@ export function ChatView() {
       queueProcessingRef.current = false;
       setIsProcessingQueue(false);
     }
-  }, [currentChatIdForQueue, isTyping, generatePlanForRequest, buildPlanPrompt, generateMockResponse, parseToolResults, evaluatePromptQuality, getPromptFeedback, getClarifyingQuestions, getCodeReviewMock, getAIResponse]);
+  }, [currentChatIdForQueue, isTyping, generatePlanForRequest, buildPlanPrompt, generateMockResponse, parseToolResults, evaluatePromptQuality, getPromptFeedback, getClarifyingQuestions, getCodeReviewMock, getAIResponse, messages]);
 
   // Запускаем обработку при появлении новых запросов
   useEffect(() => {

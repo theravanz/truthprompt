@@ -164,22 +164,25 @@ export async function sendToAI(
   apiKey: string,
   signal?: AbortSignal
 ): Promise<string> {
+  return sendToAIWithHistory(prompt, model, apiKey, signal, []);
+}
+
+/**
+ * Отправляет запрос к AI через OpenRouter с историей диалога
+ */
+export async function sendToAIWithHistory(
+  prompt: string,
+  model: string,
+  apiKey: string,
+  signal: AbortSignal | undefined,
+  conversationHistory: Array<{ role: string; content: string }>
+): Promise<string> {
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'TruthPrompt'
-      },
-      signal,
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: `Ты TruthPrompt — AI ассистент для анализа промптов и код-ревью.
+    // Формируем сообщения с историей диалога
+    const messages = [
+      {
+        role: 'system',
+        content: `Ты TruthPrompt — AI ассистент для анализа промптов и код-ревью.
 
 КРИИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО:
 - Отвечай ТОЛЬКО на том языке, на котором написал пользователь
@@ -193,15 +196,37 @@ export async function sendToAI(
 - Находить уязвимости, ошибки, проблемы с производительностью
 - Предлагать конкретные улучшения
 - Отвечать подробно, с примерами кода
-- Быть дружелюбным и полезным`
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
+- Быть дружелюбным и полезным
+
+ВАЖНО ДЛЯ ДИАЛОГА:
+- Если это первое сообщение — оцени промпт и задай 1-2 уточняющих вопроса
+- Если пользователь уже ответил на вопросы — ВЫПОЛНЯЙ задачу (пиши код/решение)
+- НЕ задавай одни и те же вопросы повторно
+- ДЕРЖИ КОНТЕКСТ — помни что обсуждалось ранее`
+      },
+      // Добавляем историю диалога
+      ...conversationHistory,
+      // Текущий запрос пользователя
+      {
+        role: 'user',
+        content: prompt
+      }
+    ];
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'TruthPrompt'
+      },
+      signal,
+      body: JSON.stringify({
+        model,
+        messages,
         temperature: 0.7,
-        max_tokens: 2000
+        max_tokens: 3000
       })
     });
 
