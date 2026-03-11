@@ -155,7 +155,7 @@ export function ChatView() {
       setError(null);
       
       const chat = await getChatWithMessages(id);
-      
+
       if (chat) {
         setChatTitle(chat.title || 'Чат');
         const mappedMessages: Message[] = chat.messages.map(msg => ({
@@ -163,7 +163,8 @@ export function ChatView() {
           role: msg.role,
           content: msg.content,
           timestamp: new Date(msg.created_at).getTime(),
-          model: msg.model_name
+          model: msg.model_name,
+          tools: msg.tools ? msg.tools as Message['tools'] : undefined
         }));
         setMessages(mappedMessages);
       }
@@ -596,9 +597,10 @@ export function ChatView() {
 
       setMessages(prev => [...prev, assistantMessage]);
 
-      // Сохраняем ответ AI в Supabase
+      // Сохраняем ответ AI в Supabase с tools
       await addMessage(currentChatIdForQueue, 'assistant', aiResponse, {
-        model_name: pendingRequest.model.name
+        model_name: pendingRequest.model.name,
+        tools: toolResults as Record<string, unknown>
       });
 
     } catch (err: any) {

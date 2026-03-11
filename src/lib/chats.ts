@@ -18,6 +18,7 @@ export interface Message {
   model_name?: string;
   score?: number;
   metadata?: Record<string, unknown>;
+  tools?: Record<string, unknown>; // Добавлено для сохранения результатов инструментов
   created_at: string;
 }
 
@@ -61,7 +62,7 @@ export async function getChatWithMessages(chatId: string): Promise<ChatWithMessa
   // Получаем сообщения
   const { data: messages, error: messagesError } = await supabase
     .from('messages')
-    .select('id, chat_id, role, content, model_name, score, metadata, created_at')
+    .select('id, chat_id, role, content, model_name, score, metadata, tools, created_at')
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true });
 
@@ -87,6 +88,7 @@ export async function addMessage(
     model_name?: string;
     score?: number;
     metadata?: Record<string, unknown>;
+    tools?: Record<string, unknown>;
   }
 ): Promise<Message> {
   const messageData = {
@@ -95,7 +97,8 @@ export async function addMessage(
     content,
     model_name: options?.model_name,
     score: options?.score,
-    metadata: options?.metadata || {}
+    metadata: options?.metadata || {},
+    tools: options?.tools || null
   };
 
   const { data, error } = await supabase

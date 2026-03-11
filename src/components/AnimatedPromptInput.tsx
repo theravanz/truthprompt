@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowRight, ChevronDown, Plus, Paperclip, X, Mic, Wand2, Brain, CheckSquare, Code2, Lightbulb } from 'lucide-react';
 import './AnimatedPromptInput.css';
 import { AIVoiceInput } from './AIVoiceInput';
@@ -349,11 +350,11 @@ export function AnimatedPromptInput({ onAnalyze }: AnimatedPromptInputProps) {
         </div>
       </div>
 
-      {showAddModal && (
+      {showAddModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="add-model-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Добавить модель</h3>
-            
+
             <div className="modal-field">
               <label>Название</label>
               <input
@@ -405,8 +406,8 @@ export function AnimatedPromptInput({ onAnalyze }: AnimatedPromptInputProps) {
               <button className="modal-cancel" onClick={() => setShowAddModal(false)}>
                 Отмена
               </button>
-              <button 
-                className="modal-add" 
+              <button
+                className="modal-add"
                 onClick={handleAddModel}
                 disabled={!newModel.name || !newModel.apiEndpoint}
               >
@@ -414,7 +415,8 @@ export function AnimatedPromptInput({ onAnalyze }: AnimatedPromptInputProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

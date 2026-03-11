@@ -323,6 +323,24 @@
   align-self: flex-start;
 }
 
+/* Контейнер для инструментов в сообщении */
+.message-tools {
+  width: 100%;
+  max-width: 800px;
+  animation: fadeInUp 0.4s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .message-avatar {
   flex-shrink: 0;
 }
